@@ -892,7 +892,7 @@ def generate(
         csharp_common.WARNING,
         Stripped(
             textwrap.dedent(
-                """\
+                f"""\
             /*
              * For more information about customizing JSON serialization in C#, please see:
              * <ul>

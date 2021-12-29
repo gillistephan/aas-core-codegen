@@ -4,7 +4,7 @@ import os
 import pathlib
 import textwrap
 import unittest
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple
 
 import asttokens
 import docutils.nodes
@@ -128,10 +128,8 @@ class Test_parsing_docstring(unittest.TestCase):
         """
         symbol_table, error = tests.common.parse_source(source)
         assert error is None, f"{error}"
-        assert symbol_table is not None
 
         symbol = symbol_table.must_find_class(Identifier("Some_class"))
-        assert symbol.description is not None
         return symbol.description.document
 
     def test_empty(self) -> None:
@@ -210,25 +208,26 @@ class Test_against_recorded(unittest.TestCase):
         assert test_cases_dir.exists(), f"{test_cases_dir=}"
         assert test_cases_dir.is_dir(), f"{test_cases_dir=}"
 
-        # The expected cases should have no errors.
-        expected_pths = sorted((test_cases_dir / "expected").glob("**/meta_model.py"))
-        meta_model_pths_expected_errors = [
-            (pth, False) for pth in expected_pths
-        ]  # type: List[Tuple[pathlib.Path, bool]]
+        for source_pth in test_cases_dir.glob("**/meta_model.py"):
+            case_dir = source_pth.parent
 
-        unexpected_pths = sorted(
-            (test_cases_dir / "unexpected").glob("**/meta_model.py")
-        )
-
-        meta_model_pths_expected_errors.extend((pth, True) for pth in unexpected_pths)
-
-        for meta_model_pth, expected_errors in meta_model_pths_expected_errors:
-            case_dir = meta_model_pth.parent
+            expected_symbol_table_pth = case_dir / "expected_symbol_table.txt"
+            expected_error_pth = case_dir / "expected_error.txt"
 
             try:
-                source = meta_model_pth.read_text(encoding="utf-8")
+                source = source_pth.read_text(encoding='utf-8')
 
                 symbol_table, error = tests.common.parse_source(source)
+
+                symbol_table_str = (
+                    "" if symbol_table is None else parse.dump(symbol_table)
+                )
+
+                error_str = (
+                    ""
+                    if error is None
+                    else tests.common.most_underlying_messages(error)
+                )
 
             except Exception as exception:
                 raise AssertionError(
@@ -236,62 +235,19 @@ class Test_against_recorded(unittest.TestCase):
                     f"for the test case {case_dir.relative_to(test_cases_dir)}"
                 ) from exception
 
-            if not expected_errors and error is not None:
-                raise AssertionError(
-                    f"Expected no errors in the test "
-                    f"case {case_dir.relative_to(test_cases_dir)}, but got:\n"
-                    f"{tests.common.most_underlying_messages(error)}"
+            if Test_against_recorded.RERECORD:
+                expected_symbol_table_pth.write_text(symbol_table_str)
+                expected_error_pth.write_text(error_str)
+            else:
+                expected_symbol_table_str = expected_symbol_table_pth.read_text()
+                self.assertEqual(
+                    expected_symbol_table_str,
+                    symbol_table_str,
+                    f"{case_dir=}, {error=}",
                 )
 
-            elif expected_errors and error is None:
-                raise AssertionError(
-                    f"Expected errors in the test "
-                    f"case {case_dir.relative_to(test_cases_dir)}, but got none."
-                )
-
-            else:
-                pass
-
-            expected_symbol_table_pth = case_dir / "expected_symbol_table.txt"
-            expected_error_pth = case_dir / "expected_error.txt"
-
-            if expected_errors:
-                if expected_symbol_table_pth.exists():
-                    raise AssertionError(
-                        f"Unexpected recorded symbol table file when errors "
-                        f"are expected: {expected_symbol_table_pth}"
-                    )
-
-                assert error is not None
-
-                error_str = tests.common.most_underlying_messages(error)
-
-                if Test_against_recorded.RERECORD:
-                    expected_error_pth.write_text(error_str)
-                else:
-                    expected_error_str = expected_error_pth.read_text()
-                    self.assertEqual(expected_error_str, error_str, f"{case_dir=}")
-
-            else:
-                if expected_error_pth.exists():
-                    raise AssertionError(
-                        f"Unexpected recorded error file when no errors "
-                        f"are expected: {expected_error_pth}"
-                    )
-
-                assert symbol_table is not None
-
-                symbol_table_str = parse.dump(symbol_table)
-
-                if Test_against_recorded.RERECORD:
-                    expected_symbol_table_pth.write_text(symbol_table_str)
-                else:
-                    expected_symbol_table_str = expected_symbol_table_pth.read_text()
-                    self.assertEqual(
-                        expected_symbol_table_str,
-                        symbol_table_str,
-                        f"{case_dir=}, {error=}",
-                    )
+                expected_error_str = expected_error_pth.read_text()
+                self.assertEqual(expected_error_str, error_str, f"{case_dir=}")
 
 
 class Test_unexpected_class_definitions(unittest.TestCase):
@@ -309,7 +265,7 @@ class Test_unexpected_class_definitions(unittest.TestCase):
 class Test_parse_type_annotation(unittest.TestCase):
     @staticmethod
     def parse_type_annotation_from_ann_assign(
-        source: str,
+            source: str,
     ) -> Tuple[ast.AST, asttokens.ASTTokens]:
         """Encapsulate the parsing of the type annotation of a variable."""
         atok = asttokens.ASTTokens(source, parse=True)

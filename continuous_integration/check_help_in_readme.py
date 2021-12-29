@@ -2,7 +2,6 @@
 
 """Check that the help snippets in the Readme coincide with the actual output."""
 import argparse
-import difflib
 import os
 import pathlib
 import re
@@ -80,22 +79,12 @@ def capture_output_lines(command: str) -> List[str]:
         # is not properly inherited.
         command_parts[0] = sys.executable
 
-    proc = None  # type: Optional[subprocess.Popen[str]]
-    try:
-        proc = subprocess.Popen(
-            command_parts,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            encoding="utf-8",
-        )
-    except Exception as exception:
-        raise RuntimeError(
-            f"Failed to start the command {command_parts!r} "
-            f"derived from the command {command!r} in the document"
-        ) from exception
-
-    assert proc is not None
-
+    proc = subprocess.Popen(
+        command_parts,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        encoding="utf-8",
+    )
     output, err = proc.communicate()
     if err:
         raise RuntimeError(
@@ -118,9 +107,7 @@ def output_lines_to_code_block(output_lines: List[str]) -> List[str]:
     return result
 
 
-def report_a_difference(
-    got_lines: List[str], expected_lines: List[str]
-) -> Optional[str]:
+def diff(got_lines: List[str], expected_lines: List[str]) -> Optional[str]:
     """
     Report a difference between the ``got`` and ``expected``.
 
@@ -129,8 +116,23 @@ def report_a_difference(
     if got_lines == expected_lines:
         return None
 
-    diff = difflib.ndiff(got_lines, expected_lines)
-    return "\n".join(diff)
+    result = []
+
+    result.append("Expected:")
+    for i, line in enumerate(expected_lines):
+        if i >= len(got_lines) or line != got_lines[i]:
+            print("DIFF: {:2d}: {!r}".format(i, line))
+        else:
+            print("OK  : {:2d}: {!r}".format(i, line))
+
+    result.append("Got:")
+    for i, line in enumerate(got_lines):
+        if i >= len(expected_lines) or line != expected_lines[i]:
+            print("DIFF: {:2d}: {!r}".format(i, line))
+        else:
+            print("OK  : {:2d}: {!r}".format(i, line))
+
+    return "\n".join(result)
 
 
 def main() -> int:
@@ -146,8 +148,7 @@ def main() -> int:
     overwrite = bool(args.overwrite)
 
     this_dir = pathlib.Path(os.path.realpath(__file__)).parent
-    repo_root = this_dir.parent
-    pth = repo_root / "README.rst"
+    pth = this_dir / "README.rst"
 
     text = pth.read_text(encoding="utf-8")
     lines = text.splitlines()
@@ -193,9 +194,7 @@ def main() -> int:
             expected_lines = lines[block.start_line_idx : block.end_line_idx]
             expected_lines = [line.rstrip() for line in expected_lines]
 
-            diff_error = report_a_difference(
-                got_lines=code_block_lines, expected_lines=expected_lines
-            )
+            diff_error = diff(got_lines=code_block_lines, expected_lines=expected_lines)
             if diff_error is not None:
                 print(diff_error, file=sys.stderr)
                 return -1

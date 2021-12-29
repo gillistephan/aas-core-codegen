@@ -2,7 +2,6 @@ import os
 import pathlib
 import textwrap
 import unittest
-from typing import List, Tuple
 
 import tests.common
 from aas_core_codegen import intermediate
@@ -104,7 +103,7 @@ class Test_parsing_docstrings(unittest.TestCase):
         assert some_class.description is not None
 
         symbol_references = list(
-            some_class.description.document.findall(
+            some_class.description.document.traverse(
                 condition=intermediate_doc.SymbolReference
             )
         )
@@ -126,28 +125,13 @@ class Test_against_recorded(unittest.TestCase):
         assert test_cases_dir.exists(), f"{test_cases_dir=}"
         assert test_cases_dir.is_dir(), f"{test_cases_dir=}"
 
-        # The expected cases should have no errors.
-        expected_pths = sorted((test_cases_dir / "expected").glob("**/meta_model.py"))
-        meta_model_pths_expected_errors = [
-            (pth, False) for pth in expected_pths
-        ]  # type: List[Tuple[pathlib.Path, bool]]
+        for source_pth in test_cases_dir.glob("**/meta_model.py"):
+            case_dir = source_pth.parent
 
-        unexpected_pths = sorted(
-            (test_cases_dir / "unexpected").glob("**/meta_model.py")
-        )
+            expected_symbol_table_pth = case_dir / "expected_symbol_table.txt"
+            expected_error_pth = case_dir / "expected_error.txt"
 
-        meta_model_pths_expected_errors.extend((pth, True) for pth in unexpected_pths)
-
-        for meta_model_pth, expected_errors in meta_model_pths_expected_errors:
-            case_dir = meta_model_pth.parent
-
-            try:
-                source = meta_model_pth.read_text(encoding="utf-8")
-            except Exception as exception:
-                raise AssertionError(
-                    f"Unexpected exception when reading "
-                    f"from {meta_model_pth.relative_to(repo_root)}"
-                ) from exception
+            source = source_pth.read_text(encoding='utf-8')
 
             try:
                 symbol_table, error = tests.common.translate_source_to_intermediate(
@@ -156,65 +140,30 @@ class Test_against_recorded(unittest.TestCase):
             except Exception as exception:
                 raise AssertionError(
                     f"Unexpected exception in source-to-intermediate translation "
-                    f"for source {meta_model_pth.relative_to(repo_root)}"
+                    f"for source {source_pth.relative_to(repo_root)}"
                 ) from exception
 
-            if not expected_errors and error is not None:
-                raise AssertionError(
-                    f"Expected no errors in the test "
-                    f"case {case_dir.relative_to(test_cases_dir)}, but got:\n"
-                    f"{tests.common.most_underlying_messages(error)}"
+            symbol_table_str = (
+                "" if symbol_table is None else intermediate.dump(symbol_table)
+            )
+
+            error_str = (
+                "" if error is None else tests.common.most_underlying_messages(error)
+            )
+
+            if Test_against_recorded.RERECORD:
+                expected_symbol_table_pth.write_text(symbol_table_str)
+                expected_error_pth.write_text(error_str)
+            else:
+                expected_symbol_table_str = expected_symbol_table_pth.read_text()
+                self.assertEqual(
+                    expected_symbol_table_str,
+                    symbol_table_str,
+                    f"{case_dir=}, {error=}",
                 )
 
-            elif expected_errors and error is None:
-                raise AssertionError(
-                    f"Expected errors in the test "
-                    f"case {case_dir.relative_to(test_cases_dir)}, but got none."
-                )
-
-            else:
-                pass
-
-            expected_symbol_table_pth = case_dir / "expected_symbol_table.txt"
-            expected_error_pth = case_dir / "expected_error.txt"
-
-            if expected_errors:
-                if expected_symbol_table_pth.exists():
-                    raise AssertionError(
-                        f"Unexpected recorded symbol table file when errors "
-                        f"are expected: {expected_symbol_table_pth}"
-                    )
-
-                assert error is not None
-
-                error_str = tests.common.most_underlying_messages(error)
-
-                if Test_against_recorded.RERECORD:
-                    expected_error_pth.write_text(error_str)
-                else:
-                    expected_error_str = expected_error_pth.read_text()
-                    self.assertEqual(expected_error_str, error_str, f"{case_dir=}")
-
-            else:
-                if expected_error_pth.exists():
-                    raise AssertionError(
-                        f"Unexpected recorded error file when no errors "
-                        f"are expected: {expected_error_pth}"
-                    )
-
-                assert symbol_table is not None
-
-                symbol_table_str = intermediate.dump(symbol_table)
-
-                if Test_against_recorded.RERECORD:
-                    expected_symbol_table_pth.write_text(symbol_table_str)
-                else:
-                    expected_symbol_table_str = expected_symbol_table_pth.read_text()
-                    self.assertEqual(
-                        expected_symbol_table_str,
-                        symbol_table_str,
-                        f"{case_dir=}, {error=}",
-                    )
+                expected_error_str = expected_error_pth.read_text()
+                self.assertEqual(expected_error_str, error_str, f"{case_dir=}")
 
 
 if __name__ == "__main__":

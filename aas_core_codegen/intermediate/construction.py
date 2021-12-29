@@ -178,9 +178,9 @@ def _call_as_call_to_super_init(
             None,
             Error(
                 double_star_keyword,
-                "Expected a call to a super ``__init__`` to provide only "
-                "explicit keyword arguments, "
-                "but got a double-star keyword argument",
+                f"Expected a call to a super ``__init__`` to provide only "
+                f"explicit keyword arguments, "
+                f"but got a double-star keyword argument",
             ),
         )
 
@@ -349,7 +349,7 @@ def _understand_assignment(
             Error(
                 target.value,
                 f"The property has not been previously "
-                f"defined in the class {parsed_class.name!r}: {target.attr}",
+                f"defined in {parsed_class.name}: {target.attr}",
             ),
         )
 
@@ -470,8 +470,7 @@ def _understand_assignment(
     return None, Error(
         assign,
         f"The handling of the constructor statement "
-        f"has not been implemented: {ast.dump(assign)}; "
-        f"please notify the developers if you really need this feature",
+        f"has not been implemented: {ast.dump(assign)}",
     )
 
 

@@ -7,7 +7,7 @@ from icontract import ensure, DBC
 
 from aas_core_codegen.intermediate import doc
 
-T = TypeVar("T")
+T = TypeVar("T")  # pylint: disable=invalid-name
 
 
 class DocutilsElementTransformer(Generic[T], DBC):

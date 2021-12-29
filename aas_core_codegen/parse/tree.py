@@ -9,7 +9,7 @@ from icontract import DBC
 from aas_core_codegen import stringify
 from aas_core_codegen.common import Identifier, assert_never
 
-T = TypeVar("T")
+T = TypeVar("T")  # pylint: disable=invalid-name
 
 
 class Node(abc.ABC):
@@ -103,13 +103,13 @@ class Comparison(Expression):
     def __init__(
         self,
         left: "Expression",
-        op: Comparator,
+        op: Comparator,  # pylint: disable=invalid-name
         right: "Expression",
         original_node: ast.AST,
     ) -> None:
         Expression.__init__(self, original_node=original_node)
         self.left = left
-        self.op = op
+        self.op = op  # pylint: disable=invalid-name
         self.right = right
 
     def transform(self, transformer: "Transformer[T]") -> T:

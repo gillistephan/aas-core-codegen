@@ -1,0 +1,1 @@
+- all impl specific go snippets are currently in a txt file. I can't see the red marking in my editor due to the missing package.. So, txt is fine for now.

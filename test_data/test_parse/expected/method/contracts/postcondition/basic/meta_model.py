@@ -1,8 +1,6 @@
 class Something:
-    x: int
-
-    @ensure(lambda self, result: self.x < result)
-    def do_something(self, y: int) -> int:
+    @ensure(lambda self, result, x: self.y < x < result)
+    def do_something(self, x: int) -> int:
         pass
 
 

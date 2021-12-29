@@ -5,6 +5,8 @@ import asttokens
 
 from aas_core_codegen.parse import _types, _translate, _stringify
 
+# pylint: disable=invalid-name
+
 TypeAnnotation = _types.TypeAnnotation
 AtomicTypeAnnotation = _types.AtomicTypeAnnotation
 SelfTypeAnnotation = _types.SelfTypeAnnotation

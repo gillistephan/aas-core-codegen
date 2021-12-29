@@ -64,7 +64,7 @@ class _ParseComparison(_Parse):
 
         assert isinstance(left, tree.Expression), f"{left=}"
 
-        op = _AST_COMPARATOR_TO_OURS[type(node.ops[0])]
+        op = _AST_COMPARATOR_TO_OURS[type(node.ops[0])]  # pylint: disable=invalid-name
 
         right, error = ast_node_to_our_node(node.comparators[0])
         if error is not None:
@@ -488,15 +488,7 @@ def _assert_chains_follow_file_structure() -> None:
     in which the classes are defined.
     """
     this_file = pathlib.Path(os.path.realpath(__file__))
-
-    # If we are in an environment where we can not load the file, skip this assertion.
-    # This is the case, for example, in a pyinstaller package.
-    if not this_file.exists():
-        return
-
-    root = ast.parse(
-        source=this_file.read_text(encoding="utf-8"), filename=str(this_file)
-    )
+    root = ast.parse(source=this_file.read_text(), filename=str(this_file))
     assert isinstance(root, ast.Module)
 
     expected_parse_names = [

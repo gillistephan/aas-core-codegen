@@ -435,7 +435,7 @@ class Inferrer(parse_tree.RestrictedTransformer[Optional["TypeAnnotationUnion"]]
         """Initialize with the given values."""
         self._symbol_table = symbol_table
 
-        self._environment = dict(environment.items())
+        self._environment = {key: value for key, value in environment.items()}
 
         self.type_map = dict()
         self.errors = []
@@ -821,6 +821,8 @@ class Inferrer(parse_tree.RestrictedTransformer[Optional["TypeAnnotationUnion"]]
         self.type_map[node] = result
         return result
 
+
+# pylint: disable=invalid-name
 
 TypeAnnotationUnion = Union[
     PrimitiveTypeAnnotation,

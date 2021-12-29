@@ -59,7 +59,7 @@ def _generate_ivisitor(symbol_table: intermediate.SymbolTable) -> Stripped:
             writer.write("\n")
         writer.write(textwrap.indent(block, I))
 
-    writer.write("\n}  // public interface IVisitor")
+    writer.write(f"\n}}  // public interface IVisitor")
 
     return Stripped(writer.getvalue())
 
@@ -127,7 +127,7 @@ def _generate_visitor_through(symbol_table: intermediate.SymbolTable) -> Strippe
             writer.write("\n")
         writer.write(textwrap.indent(block, I))
 
-    writer.write("\n}  // public class VisitorThrough")
+    writer.write(f"\n}}  // public class VisitorThrough")
 
     return Stripped(writer.getvalue())
 
@@ -176,7 +176,7 @@ def _generate_ivisitor_with_context(symbol_table: intermediate.SymbolTable) -> S
             writer.write("\n")
         writer.write(textwrap.indent(block, I))
 
-    writer.write("\n}  // public interface IVisitorWithContext")
+    writer.write(f"\n}}  // public interface IVisitorWithContext")
 
     return Stripped(writer.getvalue())
 
@@ -227,7 +227,7 @@ def _generate_itransformer(symbol_table: intermediate.SymbolTable) -> Stripped:
             writer.write("\n")
         writer.write(textwrap.indent(block, I))
 
-    writer.write("\n}  // public interface ITransformer")
+    writer.write(f"\n}}  // public interface ITransformer")
 
     return Stripped(writer.getvalue())
 
@@ -281,7 +281,7 @@ def _generate_itransformer_with_context(
             writer.write("\n")
         writer.write(textwrap.indent(block, I))
 
-    writer.write("\n}  // public interface ITransformerWithContext")
+    writer.write(f"\n}}  // public interface ITransformerWithContext")
 
     return Stripped(writer.getvalue())
 

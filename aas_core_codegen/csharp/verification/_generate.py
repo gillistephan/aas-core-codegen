@@ -1366,7 +1366,7 @@ def _generate_implementation_verify(
         assert_never(something)
 
     if len(blocks) == 0:
-        blocks.append(Stripped("// There is no verification specified."))
+        blocks.append(Stripped(f"// There is no verification specified."))
 
     cls_name = csharp_naming.class_name(something.name)
 
@@ -1481,7 +1481,7 @@ def _generate_implementation_class(
     writer = io.StringIO()
     writer.write(
         textwrap.dedent(
-            """\
+            f"""\
             /// <summary>
             /// Verify the instances of the model classes non-recursively.
             /// </summary>

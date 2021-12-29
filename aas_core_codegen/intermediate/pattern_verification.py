@@ -261,10 +261,10 @@ def try_to_understand(
             None,
             Error(
                 match_call.original_node,
-                "We do not support calls to the ``match`` function with more than "
-                "two arguments (pattern and the text to be matched) "
-                "since we could not transpile to other languages and schemas "
-                "(*e.g.*, flags such as multi-line matching)",
+                f"We do not support calls to the ``match`` function with more than "
+                f"two arguments (pattern and the text to be matched) "
+                f"since we could not transpile to other languages and schemas "
+                f"(*e.g.*, flags such as multi-line matching)",
             ),
         )
 

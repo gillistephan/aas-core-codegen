@@ -54,7 +54,7 @@ def _generate_enum_to_and_from_string(
 
     # region To-string-method
 
-    to_str_name = csharp_naming.method_name(Identifier("to_string"))
+    to_str_name = csharp_naming.method_name(Identifier(f"to_string"))
 
     to_str_writer = io.StringIO()
     to_str_writer.write(
