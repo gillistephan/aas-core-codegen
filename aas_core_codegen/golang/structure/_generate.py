@@ -1,55 +1,17 @@
 import io
 import textwrap
-from typing import Tuple, Iterator, Union, Optional, List
-from aas_core_codegen import csharp, intermediate, specific_implementations
-from aas_core_codegen.common import Error, Identifier, Rstripped, Stripped, assert_never
+from typing import Tuple, Optional, List
+
+from icontract import ensure, require
+
+from aas_core_codegen import intermediate, specific_implementations
+from aas_core_codegen.common import Error, Stripped, assert_never
 import aas_core_codegen.golang.naming as golang_naming
 from aas_core_codegen.golang import (
     common as golang_common,
     description as golang_description,
 )
-
-# NOTE (SG, 2021-12-27) import this from csharp.common; might be provided as general utility to all code generators
 from aas_core_codegen.csharp.common import over_enumerations_classes_and_interfaces
-
-
-from icontract import ensure, require
-
-
-# NOTE (SG, 2021-12-27)
-# Golang does not know the concept of enums.
-# The idiomatic Go way to represent enums is to define a new type with int32/64 as the base type.
-#
-# type Identifier int32
-#
-# Enum-literals are modeled as constants with the newly created type.
-#
-# const (
-#   Identifier_IRDI     Identifier = iota
-#   Identifier_IRI
-# )
-#
-# The go way to assign int values to the constants is by using the ``iota`` keyword.
-# It prevents from inadvertently assign the same value to more than one const.
-# Due to automatic code generation, we can assign the values directly?
-#
-# For fast lookups during de-/encoding we provide name and value maps like:
-#
-# var Identifier_name = map[Identifier]string{
-#   0: "IRDI",
-#   1: "IRI",
-# }
-#
-# var Identifier_value = map[string]Identifier{
-#   "IRDI": 0,
-#   "IRI":  1,
-# }
-#
-# In the meta-model, different enums can have the same literal value (e.g. AssetKind and ModelingKind).
-# When modeling literals as constants, this would lead to naming collisions.
-# To avoid that, the actual constants are prefixed with the enum name.
-#
-# e.g. ModelingKind_TEMPLATE; AssetKind_TEMPLATE
 
 
 @ensure(lambda result: (result[0] is None) ^ (result[1] is None))
@@ -58,84 +20,84 @@ def _generate_enum(
 ) -> Tuple[Optional[Stripped], Optional[Error]]:
     """
     Generate the Go code for the enum in the meta-model.
-    """
 
+    For each enum in the meta-model, a new type of type int32 is created.
+    Enum literals are modeled using constants, beginning with 0.
+    For stringification and lookup, a map of type map[<enum>]string and map[string]<enum>
+    is generated.
+    """
     writer = io.StringIO()
+
     if enum.description is not None:
         comment, error = golang_description.generate_comment(enum.description)
         if error:
             return None, error
 
         assert comment is not None
-        writer.write(comment)
-        writer.write("\n")
+        writer.write(f"{comment} \n")
 
     name = golang_naming.enum_name(enum.name)
 
     if len(enum.literals) == 0:
-        writer.write(f"type {name} int32 \n")
+        writer.write(Stripped(f"type {name} int32"))
         return Stripped(writer.getvalue()), None
 
-    writer.write(f"type {name} int32 \n\n")
-
-    writer.write(f"const ( \n")
+    # Block declare type
+    writer.write(f"type {name} int32")
+    writer.write("\n\n")
 
     cache = []  # Type: List[str]
-    for i, literal in enumerate(enum.literals):
-        literal_name = literal.name.upper()
-        cache.append(literal_name)
 
-        full_name = f"{name}_{literal_name}"
+    # Block Constants
+    # Open
+    writer.write("const (")
+    for i, literal in enumerate(enum.literals):
+
+        cache.append(literal.name)
+        full_name = f"{name}_{literal.name}"
         if i == 0:
             writer.write(f"{full_name} {name} = iota")
+            writer.write("\n")
         else:
-            writer.write(f"\n{full_name}")
-    writer.write(f") \n\n")
+            writer.write(f"{full_name}")
+            writer.write("\n")
 
-    writer.write(f"var {name}_name = map[{name}]string{{ \n")
-    for i, v in enumerate(cache):
-        writer.write(f'{i}: "{v}", \n')
-    writer.write(f"}} \n\n")
+    # Close
+    writer.write(")")
+    writer.write("\n\n")
 
-    writer.write(f"var {name}_value = map[string]{name}{{ \n")
+    # Block name map
+    # Open
+    writer.write(f"var {name}_name = map[{name}]string {{")
+    writer.write("\n")
     for i, v in enumerate(cache):
-        writer.write(f'"{v}": {i}, \n')
-    writer.write(f"}} \n")
+        writer.write(f'{i}: "{v}",')
+        writer.write("\n")
+    # Close
+    writer.write("}")
+    writer.write("\n\n")
+
+    # Block value map
+    # Open
+    writer.write(f"var {name}_value = map[string]{name} {{")
+    writer.write("\n")
+    for i, v in enumerate(cache):
+        writer.write(f'"{v}": {i},')
+        writer.write("\n")
+    # Close
+    writer.write("}")
+    writer.write("\n\n")
 
     # Stringer interface
-    writer.write(f"func (s {name}) String() string {{ \n")
-    writer.write(f"return {name}_name[s] \n")
-    writer.write(f"}} \n\n")
-
-    # GetValue
-    writer.write(f"func Get{name}Value(n string) {name} {{\n")
-    writer.write(f"return {name}_value[n] \n")
-    writer.write(f"}} \n\n")
-
-    # GetName
-    writer.write(f"func Get{name}Name(v {name}) string {{ \n")
-    writer.write(f"return {name}_name[v] \n")
-    writer.write(f"}}")
+    writer.write(
+        textwrap.dedent(
+            f"""func (s {name}) String() string {{ 
+                return {name}_name[s] 
+            }}"""
+        )
+    )
 
     return Stripped(writer.getvalue()), None
-
-
-# NOTE: (SG, 2021-12-27)
-# Golang does not know the concept of interfaces. The closest what we can get is
-# type embedding. To embedd a type just pass it as a namless parameter within another type
-# so that all exported parameters and methods are accessible.
-
-# e.g. type MyStruct struct {
-#   fancy       string
-# }
-#
-# type MySecondStruct struct {
-#   MyStruct
-#   fancy2      string
-# }
-#
-# For the time being, we just render the interfaces as type <Name> struct {} and all the properties.
-#
 
 
 @ensure(lambda result: (result[0] is None) ^ (result[1] is None))
@@ -143,44 +105,36 @@ def _generate_interface(
     interface: intermediate.Interface,
 ) -> Tuple[Optional[Stripped], Optional[Error]]:
     """
-    Generate Go code for the given interface
+    Generate Go code for the given interface.
+
+    Since Go does not support Generics, the main purpose of this function
+    is just to render the respective types to have them available, even if
+    they are currently not used.
     """
     writer = io.StringIO()
-
     name = golang_naming.class_name(interface.name)
-    writer.write(f"type {name} struct {{ \n")
 
-    """
-    This part would be used, if we use type embedding
-
-    inheritances = [inheritance.name for inheritance in interface.inheritances]
-    inheritance_names = list(map(golang_naming.class_name, inheritances))
-    if len(inheritance_names) > 0:
-        for i, name in enumerate(inheritance_names):
-            if i > 0:
-                writer.write("\n")
-            writer.write(f"{name} \n")
-    """
+    writer.write(f"type {name} struct {{")
+    writer.write("\n")
 
     for prop in interface.properties:
         prop_type = golang_common.generate_type(type_annotation=prop.type_annotation)
         prop_name = golang_naming.property_name(prop.name)
-        writer.write(f"{prop_name} {prop_type}\n")
+        writer.write(f"{prop_name} {prop_type}")
+        writer.write("\n")
 
     writer.write("}")
-    return Stripped(writer.getvalue()), None
+    return writer.getvalue(), None
 
 
 @require(lambda cls: not cls.is_implementation_specific)
 @ensure(lambda result: (result[0] is None) ^ (result[1] is None))
 def _generate_class(
     cls: intermediate.ConcreteClass,
-    spec_impls=specific_implementations.SpecificImplementations,
 ) -> Tuple[Optional[Stripped], Optional[Error]]:
     """
     Generate Go code for the given concrete class ``cls``.
     """
-
     writer = io.StringIO()
 
     if cls.description is not None:
@@ -189,37 +143,25 @@ def _generate_class(
             return None, error
 
         assert comment is not None
-
         writer.write(comment)
         writer.write("\n")
 
     name = golang_naming.class_name(cls.name)
-    writer.write(f"type {name} struct {{ \n")
 
-    """ 
-    This part would be used, if we use type embedding
-
-    
-    inheritances = [inheritance.name for inheritance in cls.inheritances]
-    inheritance_names = list(map(golang_naming.class_name, inheritances))
-
-    
-    if len(inheritance_names) > 0:
-        for i, name in enumerate(inheritance_names):
-            if i > 0:
-                writer.write("\n")
-            writer.write(f"{name} \n")
-     """
+    # Type Block
+    # Start
+    writer.write(f"type {name} struct {{")
+    writer.write("\n")
 
     for prop in cls.properties:
-
         prop_type = golang_common.generate_type(type_annotation=prop.type_annotation)
         prop_name = golang_naming.property_name(prop.name)
-        writer.write(f"{prop_name} {prop_type} \n")
-
+        writer.write(f"{prop_name} {prop_type}")
+        writer.write("\n")
+    # End
     writer.write("}")
 
-    return Stripped(writer.getvalue()), None
+    return writer.getvalue(), None
 
 
 def generate(
@@ -233,7 +175,7 @@ def generate(
     errors = []  # type List[Error]
 
     # package_name
-    blocks.append(Stripped(f"package {package_name}"))
+    blocks.append(f"package {package_name}")
 
     for something in over_enumerations_classes_and_interfaces(symbol_table):
         code = None  # type: Optional[Stripped]
@@ -253,16 +195,14 @@ def generate(
                     f"The implementation is missing "
                     f"for the implementation-specific class: {impl_key}",
                 )
+                break
         else:
             if isinstance(something, intermediate.Enumeration):
                 code, error = _generate_enum(enum=something)
-
             elif isinstance(something, intermediate.Interface):
                 code, error = _generate_interface(interface=something)
-
             elif isinstance(something, intermediate.ConcreteClass):
                 code, error = _generate_class(cls=something)
-
             else:
                 assert_never(something)
 
@@ -271,17 +211,15 @@ def generate(
             errors.append(error)
         else:
             assert code is not None
-            blocks.append(Rstripped(code))
+            blocks.append(Stripped(code))
 
         if len(errors) > 0:
             return None, errors
 
-        out = io.StringIO()
-
+        writer = io.StringIO()
         for i, b in enumerate(blocks):
             if i > 0:
-                out.write("\n\n")
-            out.write(b)
-        out.write("\n")
+                writer.write("\n\n")
+            writer.write(b)
 
-    return out.getvalue(), None
+    return writer.getvalue(), None

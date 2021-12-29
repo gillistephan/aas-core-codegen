@@ -1,6 +1,6 @@
 """Gender descriptions to Go code"""
 from icontract import ensure
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 import docutils.nodes
 import docutils.utils
 import xml.sax.saxutils
@@ -12,7 +12,8 @@ from aas_core_codegen.intermediate import (
     doc as intermediate_doc,
 )
 
-
+# Godocs are straight forward, they don't have any language constructs or
+# machine readable syntax. They are just "comments".
 class _ElementRenderer(intermediate_rendering.DocutilsElementTransformer[str]):
     def transform_text(
         self, element: docutils.nodes.Text
@@ -43,7 +44,16 @@ class _ElementRenderer(intermediate_rendering.DocutilsElementTransformer[str]):
     def transform_paragraph(
         self, element: docutils.nodes.paragraph
     ) -> Tuple[Optional[str], Optional[str]]:
-        return f"//TODO: transform_paragraph NOT_IMPLEMENTED", None
+        parts = []  # type: List[str]
+        for child in element.children:
+            text, error = self.transform(child)
+            if error is not None:
+                return None, error
+
+            assert text is not None
+            parts.append(text)
+
+        return "".join(parts), None
 
     @ensure(lambda result: (result[0] is not None) ^ (result[1] is not None))
     def transform_emphasis(
@@ -79,7 +89,55 @@ class _ElementRenderer(intermediate_rendering.DocutilsElementTransformer[str]):
     def transform_document(
         self, element: docutils.nodes.document
     ) -> Tuple[Optional[str], Optional[str]]:
-        return f"//TODO: transform_document NOT_IMPLEMENTED", None
+
+        summary = None  # type: Optional[docutils.nodes.paragraph]
+        remarks = []  # type: List[docutils.nodes.Element]
+        tail = []  # type: List[docutils.nodes.Element]
+
+        # Try to match the summary and the remarks
+        if len(element.children) >= 1:
+            if not isinstance(element.children[0], docutils.nodes.paragraph):
+                return None, (
+                    f"Expected the first document element to be a summary and "
+                    f"thus a paragraph, but got: {element.children[0]}"
+                )
+
+            summary = element.children[0]
+
+        remainder = element.children[1:]
+        for i, child in enumerate(remainder):
+            if isinstance(
+                child,
+                (
+                    docutils.nodes.paragraph,
+                    docutils.nodes.bullet_list,
+                    docutils.nodes.note,
+                ),
+            ):
+                remarks.append(child)
+            else:
+                tail = remainder[i:]
+                break
+
+        blocks = []  # type: List[Stripped]
+
+        renderer = _ElementRenderer()
+
+        if summary:
+            summary_text, error = renderer.transform(element=summary)
+            if error:
+                return None, error
+
+            assert summary_text is not None
+            blocks.append(f"{summary_text}\n")
+
+        # fmt: off
+        text = '\n'.join(
+            f'// {line}'
+            for line in '\n'.join(blocks).splitlines()
+        )
+        # fmt: on
+        return text, None
 
 
 @ensure(lambda result: (result[0] is None) ^ (result[1] is None))

@@ -10,6 +10,7 @@ import aas_core_codegen
 from aas_core_codegen import parse, run, specific_implementations, intermediate
 from aas_core_codegen.common import LinenoColumner, assert_never
 import aas_core_codegen.csharp.main as csharp_main
+import aas_core_codegen.golang.main as golang_main
 
 assert aas_core_codegen.__doc__ == __doc__
 
@@ -18,6 +19,7 @@ class Target(enum.Enum):
     """List available target implementations."""
 
     CSHARP = "csharp"
+    GOLANG = "golang"
 
 
 class Parameters:
@@ -102,6 +104,7 @@ def execute(params: Parameters, stdout: TextIO, stderr: TextIO) -> int:
     # BEFORE-RELEASE (mristin, 2021-12-13):
     #  test all the following individual failure cases
     atok, parse_exception = parse.source_to_atok(source=text)
+
     if parse_exception:
         if isinstance(parse_exception, SyntaxError):
             stderr.write(
@@ -117,6 +120,7 @@ def execute(params: Parameters, stdout: TextIO, stderr: TextIO) -> int:
         return 1
 
     import_errors = parse.check_expected_imports(atok=atok)
+
     if import_errors:
         run.write_error_report(
             message="One or more unexpected imports in the meta-model",
@@ -171,6 +175,9 @@ def execute(params: Parameters, stdout: TextIO, stderr: TextIO) -> int:
 
     if params.target is Target.CSHARP:
         return csharp_main.execute(context=run_context, stdout=stdout, stderr=stderr)
+
+    if params.target is Target.GOLANG:
+        return golang_main.execute(context=run_context, stdout=stdout, stderr=stderr)
 
     else:
         assert_never(params.target)

@@ -9,15 +9,10 @@ from aas_core_codegen.golang import common as golang_common, naming as golang_na
 from aas_core_codegen.common import Error, Identifier, Stripped, assert_never
 
 
-UNMARSHAL_JSON_FUNC_SIG = "unmarshalJSON(iter *json.Iterator) {"
-MARSHAL_JSON_FUNC_SIG = "marshalJSON(stream *json.Stream) {"
-READ_OBJECT_LOOP = 'for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {'
-READ_ARRAY_LOOP = "for el := iter.ReadArray(); el; el = iter.ReadArray() {"
+_UNMARSHAL_JSON_FUNC_SIG = "unmarshalJSON(iter *json.Iterator)"
+_MARSHAL_JSON_FUNC_SIG = "marshalJSON(stream *json.Stream)"
 
-# Use this map to implement a type-checker for the next element / token in the stream
-# e.g. we want do deserialize idShort, which is a (constrained)primitive type.
-# Since we know, that idShort must be of type string, we can use it like this:
-# if next != json.StringValue ... whatever is needed
+
 _PRIMITIVE_JSON_TYPE_MAP = {
     intermediate.PrimitiveType.BOOL: "json.BoolValue",
     intermediate.PrimitiveType.STR: "json.StringValue",
@@ -28,7 +23,6 @@ _PRIMITIVE_JSON_TYPE_MAP = {
     "STRING": "json.StringValue",
 }
 
-# Baisc Map to lookup the reader methods of the underlying iterator for a given primitive type
 _PRIMITIVE_JSON_READER_METHOD_MAP = {
     intermediate.PrimitiveType.BOOL: "iter.ReadBool()",
     intermediate.PrimitiveType.STR: "iter.ReadString()",
@@ -56,14 +50,10 @@ def _get_primitive_json_writer_method(
 
 
 def _whats_next_boundary(expected_json_type: str) -> Stripped:
-    # TODO (SG, 2021-12-28) next refers to a ValueType of type int, so returning got 5 (e.g. for ArrayValue) doesn't make sense here.
-    # Check here, how to get the String since ValueType does not implement Stringer interface
-    # https://github.com/json-iterator/go/blob/e6b9536d3649bda3e8842bb7e4fab489d79a97ea/iter.go
     return Stripped(
         textwrap.dedent(
-            f"""\
-            if next := iter.WhatIsNext(); next != {expected_json_type} {{
-                iter.ReportError("unexpected-json-type", fmt.Sprintf("expected {expected_json_type}, got: %s", next))
+            f"""if next := iter.WhatIsNext(); next != {expected_json_type} {{
+                    iter.ReportError("unexpected-json-type", fmt.Sprintf("expected {expected_json_type}, got: %s", next))
             }}"""
         )
     )
@@ -76,30 +66,42 @@ def _generate_for_enum(
 
     writer = io.StringIO()
 
-    # Unmarshal
-    writer.write(f"func (e {name}) {UNMARSHAL_JSON_FUNC_SIG}")
-    writer.write(_whats_next_boundary(_PRIMITIVE_JSON_TYPE_MAP["STRING"]))
+    # Unmarshal (Function)
+    # Start
     writer.write(
-        f"""
+        Stripped(
+            textwrap.dedent(
+                f"""// unmarshalJSON implements the Unmarshaler interface for {name}
+        func (e {name}) {_UNMARSHAL_JSON_FUNC_SIG} {{
             raw := iter.ReadString()
             if v, ok := {name}_value[raw]; !ok {{
-                iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", v))
+                iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", raw))
             }} else {{
                 e = v
             }}
-        """
+        }}"""
+            )
+        )
     )
-    writer.write("} \n\n")
+    # End
+    writer.write("\n\n")
 
     # Marshal
-    writer.write(f"func (e {name}) {MARSHAL_JSON_FUNC_SIG}")
+    # Start
     writer.write(
-        f"""
-            v := {name}_name[e]
-            stream.WriteString(v)
-        """
+        Stripped(
+            textwrap.dedent(
+                f"""// marshalJSON implements the Marshaler interface for {name}
+        func (e {name}) {_MARSHAL_JSON_FUNC_SIG} {{
+            if v, ok := {name}_name[e]; !ok {{
+                stream.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", e))
+            }} else {{
+                stream.WriteString(v)
+            }}    
+        }}"""
+            )
+        )
     )
-    writer.write("}")
 
     return Stripped(writer.getvalue()), None
 
@@ -111,29 +113,32 @@ def _generate_switch_property_unmarshaler(
     json_prop_name: Identifier,
     is_required: bool,
     is_array=False,
-) -> Tuple[
-    Optional[Stripped], Optional[Error]
-]:  # Even if its not needed for now, make the function return type a tuple, so that its consistent with others
+) -> Tuple[Optional[Stripped], Optional[Error]]:
     writer = io.StringIO()
     errors = []  # type: List[Error]
 
     if isinstance(type_annotation, intermediate.PrimitiveTypeAnnotation):
-        type_reader = _PRIMITIVE_JSON_READER_METHOD_MAP[type_annotation.a_type]
-
+        # primitive type annotation
+        # 1. check, if the incoming value has correct type
+        # 2. read the value from the iterator and assign it
+        type = type_annotation.a_type
+        type_reader = _PRIMITIVE_JSON_READER_METHOD_MAP[type]
         if type_reader is None:
             errors.append(
                 Error(
                     type_annotation.parsed.node,
-                    f"No reader for unmarshaling primitive type {type_annotation.a_type} defined.",
+                    f"No reader for unmarshaling primitive type {type} defined.",
                 )
             )
             return None, errors
 
         writer.write(
-            _whats_next_boundary(_PRIMITIVE_JSON_TYPE_MAP[type_annotation.a_type])
+            textwrap.dedent(
+                f"""{_whats_next_boundary(_PRIMITIVE_JSON_TYPE_MAP[type])}
+                c.{prop_name} = {type_reader}
+                """
+            )
         )
-        writer.write("\n")
-        writer.write(f"c.{prop_name} = {type_reader} \n")
 
         if not is_array and is_required:
             writer.write(f'isThere["{json_prop_name}"] = true \n')
@@ -162,36 +167,39 @@ def _generate_switch_property_unmarshaler(
     elif isinstance(type_annotation, intermediate.OurTypeAnnotation):
         symbol = type_annotation.symbol
         # enumeration
-        # enumerations (which are just types in our case) implement the unmarshaler interface
-        # we can simply call it and assign the value
         if isinstance(symbol, intermediate.Enumeration):
             type_name = golang_naming.class_name(symbol.name)
             writer.write(
                 f"""var myenum {type_name}
                     myenum.unmarshalJSON(iter) 
-                    c.{prop_name} = &myenum \n"""
+                    c.{prop_name} = &myenum
+                """
             )
-
             if not is_array and is_required:
                 writer.write(f'isThere["{json_prop_name}"] = true \n')
 
-        # constrainedPrimitive
+        # constrained primitive
         # 1. check, if the incoming value has correct type
         # 2. read the value from the iterator and assign it
         if isinstance(symbol, intermediate.ConstrainedPrimitive):
-            type_reader = _PRIMITIVE_JSON_READER_METHOD_MAP[symbol.constrainee]
+            type = symbol.constrainee
+            type_reader = _PRIMITIVE_JSON_READER_METHOD_MAP[type]
 
             if type_reader is None:
                 Error(
                     type_annotation.parsed.node,
-                    f"No reader for unmarshaling primitive type {type_annotation.a_type} defined.",
+                    f"No reader for unmarshaling primitive type {type} defined.",
                 )
 
             writer.write(
-                _whats_next_boundary(_PRIMITIVE_JSON_TYPE_MAP[symbol.constrainee])
+                Stripped(
+                    textwrap.dedent(
+                        f""" \
+                {_whats_next_boundary(_PRIMITIVE_JSON_TYPE_MAP[type])}
+                c.{prop_name} = {type_reader}"""
+                    )
+                )
             )
-            writer.write("\n")
-            writer.write(f"c.{prop_name} = {type_reader} \n")
 
             if not is_array and is_required:
                 writer.write(f'isThere["{json_prop_name}"] = true \n')
@@ -202,14 +210,16 @@ def _generate_switch_property_unmarshaler(
             impl_name = golang_naming.class_name(symbol.name)
             writer.write(
                 f"""myobj := &{impl_name}{{}}
-                    myobj.unmarshalJSON(iter) \n"""
+                    myobj.unmarshalJSON(iter)
+                """
             )
 
             if is_array:
-                writer.write(f"c.{prop_name} = append(c.{prop_name}, *myobj);")
+                writer.write(f"c.{prop_name} = append(c.{prop_name}, *myobj); \n")
             else:
                 if is_required:
                     writer.write(f'isThere["{json_prop_name}"] = true \n')
+
                 writer.write(f"c.{prop_name} = myobj;")
 
     elif isinstance(type_annotation, intermediate.RefTypeAnnotation):
@@ -217,9 +227,12 @@ def _generate_switch_property_unmarshaler(
         pass
 
     elif isinstance(type_annotation, intermediate.ListTypeAnnotation):
-        writer.write(_whats_next_boundary(_PRIMITIVE_JSON_TYPE_MAP["ARRAY"]))
-        writer.write("\n")
-        writer.write(READ_ARRAY_LOOP)
+        writer.write(
+            f""" \
+            // loop through every element in the array and unmarshal it
+            for el := iter.ReadArray(); el; el = iter.ReadArray() {{
+        """
+        )
 
         # generate the unmarshaller recursively
         code, error = _generate_switch_property_unmarshaler(
@@ -242,6 +255,7 @@ def _generate_switch_property_unmarshaler(
         assert code is not None
 
         writer.write(f"{code} }} \n")
+
         if is_required:
             writer.write(f'isThere["{json_prop_name}"] = true \n')
 
@@ -272,7 +286,7 @@ def _generate_property_marshaler(
                     f"No writer for marshaling primitive type {type_annotation.a_type}",
                 )
             )
-        writer.write(method_writer)
+        writer.write(f"{method_writer} \n")
 
     elif isinstance(type_annotation, intermediate.OptionalTypeAnnotation):
         code, error = _generate_property_marshaler(
@@ -311,24 +325,25 @@ def _generate_property_marshaler(
         # class
         if isinstance(symbol, intermediate.Class):
             writer.write(f"c.{prop_name}.marshalJSON(stream) \n")
-            pass
 
     elif isinstance(type_annotation, intermediate.RefTypeAnnotation):
         pass
 
     elif isinstance(type_annotation, intermediate.ListTypeAnnotation):
-
-        writer.write("stream.WriteArrayStart() \n")
-        writer.write(f"for i, k := range c.{prop_name} {{ \n")
-        writer.write(f"k.marshalJSON(stream) \n")
         writer.write(
-            f"""if i < len(c.{prop_name}) - 1 {{
-                stream.WriteMore()
-            }}
-            """
+            textwrap.dedent(
+                f"""// loop through every element in the slice and write it to the stream
+                    stream.WriteArrayStart()
+                    for i, k := range c.{prop_name} {{
+                        k.marshalJSON(stream)
+                        if i < len(c.{prop_name}) - 1 {{
+                            stream.WriteMore()
+                        }}
+                    }}
+                    stream.WriteArrayEnd()
+                """
+            )
         )
-        writer.write("}\n")
-        writer.write("stream.WriteArrayEnd() \n")
 
         pass
 
@@ -351,49 +366,38 @@ def _generate_for_class(
     # that takes the result of the other writers and concatenates it
     unmarshaler_writer = io.StringIO()
 
-    # verifier_writer writes the map for verifying required attributes
-    # map has the following layout:
-    #   isThere := map[string]bool {
-    #       "idShort": false
-    #   }
-    # given property idShort is required
     verifier_writer = io.StringIO()
-    verifier_writer.write("isThere := map[string]bool {\n")
+    # Open verifier map
+    verifier_writer.write("isThere := map[string]bool { \n")
 
     switch_writer = io.StringIO()
 
-    # Unmarshaler starts here
-    unmarshaler_writer.write(f"func (c *{name}) {UNMARSHAL_JSON_FUNC_SIG}")
+    # Unmarshal (Function)
+    # Start
+    unmarshaler_writer.write(
+        f"""// unmarshalJSON implements the Unmarshaler interface for {name}
+        func (c *{name}) {_UNMARSHAL_JSON_FUNC_SIG} {{
+        """
+    )
 
-    # In case of the AAS-Meta-Model we can be sure, that the first element in the byte-array
-    # is always an object.
-    switch_writer.write(READ_OBJECT_LOOP)
-    switch_writer.write("switch f {")
-
+    # Start Switch
+    switch_writer.write(
+        """// iterate through all provided object properties and switch on property name
+            for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
+            switch f {"""
+    )
     for prop in clazz.properties:
         prop_name = golang_naming.property_name(prop.name)
         json_prop_name = naming.json_property(prop.name)
         is_required = False
 
-        # If the property is not optional, register it in the map
+        # property is not optional? write it to the verifier
         if not isinstance(prop.type_annotation, intermediate.OptionalTypeAnnotation):
             is_required = True
             verifier_writer.write(f'"{json_prop_name}": false, \n')
 
-        # NOTE (SG, 2021-12-28) We use the same approach like in the example c# lib:
-        # One-Pass De/Serialization. We do hence not know the next property or element
-        # in the stream. Therefore we read the next property-name from the stream and
-        # call the aproperiate de/serialization operation on the respective property-name.
-        #
-        # e.g.
-        # case "dataSpecifications": {
-        #   if is primitive --> iter.ReadString() or whatever is needed
-        #   if is not primitive:
-        #       - for lists loop trough each element in the list
-        #       - for non-lists: call the (un)marshalJSON method, since they have to implement the
-        #         (Un)Marshaler interface
-        # }
-        switch_writer.write(f'case "{json_prop_name}":\n')
+        switch_writer.write(f'case "{json_prop_name}": \n')
+
         code, error = _generate_switch_property_unmarshaler(
             type_annotation=prop.type_annotation,
             prop_name=prop_name,
@@ -411,12 +415,18 @@ def _generate_for_class(
     # throw an error if the property is unknown or does not belong to the object
     switch_writer.write(
         f"""default:
-            iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object {naming.json_property(clazz.name)}", f)) }}}}
+            iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object {naming.json_property(clazz.name)}", f))
             """
     )
-    verifier_writer.write("}\n\n")
+    # End Switch
+    switch_writer.write("}}")
 
+    # Close Verifier Map
+    verifier_writer.write("} \n")
+
+    # Write the verifier value at the very top
     unmarshaler_writer.write(verifier_writer.getvalue())
+    # Append switch values
     unmarshaler_writer.write(switch_writer.getvalue())
 
     unmarshaler_writer.write(
@@ -431,10 +441,17 @@ def _generate_for_class(
     unmarshaler_writer.write("}")
     blocks.append(unmarshaler_writer.getvalue())
 
-    # Marshaler
     marshaler_writer = io.StringIO()
-    marshaler_writer.write(f"func (c *{name}) {MARSHAL_JSON_FUNC_SIG}")
-    marshaler_writer.write(f"stream.WriteObjectStart() \n")
+    # Marshal (Function)
+    # Start
+    marshaler_writer.write(
+        f""" \
+        // marshalJSON implements Marshaler interface for {name}
+        func (c *{name}) {_MARSHAL_JSON_FUNC_SIG} {{
+            stream.WriteObjectStart()
+
+        """
+    )
 
     for i, prop in enumerate(clazz.properties):
         prop_name = golang_naming.property_name(prop.name)
@@ -442,7 +459,6 @@ def _generate_for_class(
         is_required = False
 
         marshaler_writer.write(f'stream.WriteObjectField("{json_prop_name}") \n')
-
         if not isinstance(prop.type_annotation, intermediate.OptionalTypeAnnotation):
             is_required = True
 
@@ -457,11 +473,10 @@ def _generate_for_class(
             errors.append(error)
 
         assert code is not None
+        marshaler_writer.write(code)
 
         if i > 0 and i < len(clazz.properties):
             marshaler_writer.write(f"stream.WriteMore() \n\n")
-
-        marshaler_writer.write(code)
 
     marshaler_writer.write(f"\n\nstream.WriteObjectEnd() \n")
     marshaler_writer.write("}")
