@@ -1,5 +1,0 @@
-<schema
-        elementFormDefault="qualified"
-        targetNamespace="http://www.admin-shell.io/aas/3/0"
-        xmlns="http://www.w3.org/2001/XMLSchema"
-/>
