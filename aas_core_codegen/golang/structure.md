@@ -1,3 +1,22 @@
+## Structure (aka Types)
+Go does not know the concept of enums. The idiomatic Go way is to introduce a new type with `int32` as base type; 
+E.g. `type Identifier int32`. Enum iterals are modeled as constants with the newly created type. For lookups during de-/encoding and stringification,  name and value maps are provided 
+```golang
+var Identifier_name = map[Identifier]string {
+  0: "IRDI",
+  1: "IRI",
+}
+```
+Since different enums can have the same literal value (e.g. AssetKind and ModelingKind) the constants are prefixed with the enum name `ModelingKind_TEMPLATE` and `AssetKind_TEMPLATE`. Although Go will introduce Generics in Go 1.18, I think they won't provide any big value for the representation for the meta-model. The closest to interfaces or abstract classes what we can get in Go is type embedding.
+```golang
+ type myStruct {}
+ type mySecondStruct{
+     myStruct
+}
+```
+The object is just passed as a nameless parameter within the other object so that all exported parameters and methods are accessible. The types can be generated with embedded types. As I am not a big fan of it, I am just rendering the interfaces as type <Name> struct with all its properties. 
+
+
 ## JSON De-/Encoding
 
 It would be nice, if the API (Package) in Go for De-/Encoding would feel like using the API from the standard lib, provided by Go. The De-/Encode of objects in Go looks like the following:
