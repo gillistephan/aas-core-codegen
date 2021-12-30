@@ -5,20 +5,25 @@ package aascore
 import (
 	"fmt"
 	"io"
+	"reflect"
 
 	json "github.com/json-iterator/go"
 )
 
-// Marshaler is the interface implemented by all types of the meta-model
+const (
+	NonNilPointerError = "v must be a pointer and non nil"
+)
+
+// AasCoreMarshaler is the interface implemented by all types of the meta-model
 // that can marshal themselves into a valid JSON.
-type Marshaler interface {
-	marshalJSON(stream *json.Stream) error
+type AasCoreMarshaler interface {
+	marshalJSON(stream *json.Stream)
 }
 
-// Unmarshaler is the interface implemented by all types of the meta-model
+// AasCoreUnmarshaler is the interface implemented by all types of the meta-model
 // that can unmarshal a JSON description of themselves.
-type Unmarshaler interface {
-	unmarshalJSON(iter *json.Iterator) error
+type AasCoreUnmarshaler interface {
+	unmarshalJSON(iter *json.Iterator)
 }
 
 // Encoder writes JSON values to an output stream.
@@ -31,25 +36,86 @@ type Decoder struct {
 	iter *json.Iterator
 }
 
+// isNonNilPointer checks, if a given value v is a pointer or not nil
+func isNonNilPointer(v interface{}) bool {
+	rv := reflect.ValueOf(v)
+	if rv.Kind() != reflect.Ptr || rv.IsNil() {
+		return false
+	}
+	return true
+}
+
+// Unmarshal parses the JSON-encoded data and stores
+// the result in the value pointed by v. If v is nil or not a pointer
+// Unmarshal returns an error. If v implements the AasCoreUnmarshaler interface
+// of the AAS-Meta-Model, data will be decoded according to the specifications of
+// the meta-model. If not, Unmarshal will decode the data in complience with
+// the standard library. It can be used as a drop-in replacement
+// of the encoding/json standard library.
+func Unmarshal(data []byte, v interface{}) error {
+	if isNonNilPointer(v) {
+		return fmt.Errorf(NonNilPointerError)
+	}
+
+	if u, ok := v.(AasCoreUnmarshaler); !ok {
+		return json.Unmarshal(data, data)
+	} else {
+		iter := json.ParseBytes(json.ConfigDefault, data)
+		dec := &Decoder{iter}
+		err := dec.Decode(u)
+		return err
+	}
+}
+
+// Marshal traverses the value v recursively. If v implements the AasCoreMarshaler
+// interface and is not a nil pointer, Marshal calls the marshalJSON method to encode
+// v according to the specifications of the AAS-Meta-Model. If v does not implement the
+// AasCoreMarshaler interface, Marshal will decode the data in complience with standard
+// library. It can be used as a drop-in replacement of the encoding/json standard library.
+func Marshal(v interface{}) ([]byte, error) {
+	if m, ok := v.(AasCoreMarshaler); !ok {
+		return json.Marshal(v)
+	} else {
+		stream := json.ConfigDefault.BorrowStream(nil)
+		enc := &Encoder{stream}
+		err := enc.Encode(m)
+		if err != nil {
+			return nil, err
+		}
+		bytes := enc.stream.Buffer()
+		return bytes, nil
+	}
+}
+
 // NewDecoder returns a new Decoder that reads from r.
 // Bs is the internal buffer size set in the NewDecoder.
 func NewDecoder(bs int, r io.Reader) *Decoder {
-	iter := json.Parse(json.ConfigDefault, r, bs)
+	iter := json.Parse(json.ConfigCompatibleWithStandardLibrary, r, bs)
 	return &Decoder{iter}
 }
 
 // NewEcoder returns a new Encoder that writes to w.
 // Bs is the internal buffer size set in the NewEncoder.
 func NewEncoder(bs int, w io.Writer) *Encoder {
-	stream := json.NewStream(json.ConfigDefault, w, bs)
+	stream := json.NewStream(json.ConfigCompatibleWithStandardLibrary, w, bs)
 	return &Encoder{stream}
 }
 
 // Decode reads the next encoded value from its input and
-// writes it in the value pointed to by v. V must implement
-// the Unmarshaler interface.
-func (d *Decoder) Decode(v Unmarshaler) error {
-	v.unmarshalJSON(d.iter)
+// writes it in the value pointed to by v. If v implements
+// the AasCoreUnmarshaler interface, v will be decoded according
+// to the specifications of the AAS-Meta-Model. If not,
+// Decode will decode the data in complience with the standard library.
+// It can be used as a drop-in replacement of the encoding/json standard library.
+func (d *Decoder) Decode(v interface{}) error {
+	if isNonNilPointer(v) {
+		return fmt.Errorf(NonNilPointerError)
+	}
+	if u, ok := v.(AasCoreUnmarshaler); !ok {
+		d.iter.ReadVal(v)
+	} else {
+		u.unmarshalJSON(d.iter)
+	}
 	err := d.iter.Error
 	if err == io.EOF {
 		return nil
@@ -57,18 +123,28 @@ func (d *Decoder) Decode(v Unmarshaler) error {
 	return d.iter.Error
 }
 
-// Encode writes the encoding of v to the input stream v
-// V must implement the Marshaler interface.
-func (e *Encoder) Encode(v Marshaler) error {
-	v.marshalJSON(e.stream)
+// Encode writes the encoding of v to the input stream v.
+// If v implements the AasCoreMarshaler interface and v is
+// not a nil pointer, Encode calls the marshalJSON method recursively
+// and encodes the data according to the specifications of the AAS-Meta-Model.
+// If v does not implement AasCoreMarshaler interface, Encode will encode the
+// data in complience with the standard library. It can be used as a drop-in
+// replacement of the encoding/json standard library.
+func (e *Encoder) Encode(v interface{}) error {
+	if m, ok := v.(AasCoreMarshaler); !ok {
+		e.stream.WriteVal(v)
+	} else {
+		m.marshalJSON(e.stream)
+	}
 	e.stream.WriteRaw("\n")
 	e.stream.Flush()
 	return e.stream.Error
 }
 
+// unmarshalJSON implements the Unmarshaler interface for HasSemantics
 func (c *HasSemantics) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "semanticID":
@@ -79,7 +155,6 @@ func (c *HasSemantics) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object hasSemantics", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -88,19 +163,22 @@ func (c *HasSemantics) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for HasSemantics
 func (c *HasSemantics) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("semanticID")
 	c.SemanticId.marshalJSON(stream)
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for Extension
 func (c *Extension) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"name": false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "semanticID":
@@ -130,7 +208,6 @@ func (c *Extension) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object extension", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -139,41 +216,40 @@ func (c *Extension) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for Extension
 func (c *Extension) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("semanticID")
 	c.SemanticId.marshalJSON(stream)
 	stream.WriteObjectField("name")
-	stream.WriteMore()
-
 	stream.WriteString(c.Name)
+	stream.WriteMore()
+
 	stream.WriteObjectField("valueType")
-	stream.WriteMore()
-
 	c.ValueType.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("value")
-	stream.WriteMore()
-
 	stream.WriteString(c.Value)
-	stream.WriteObjectField("refersTo")
 	stream.WriteMore()
 
+	stream.WriteObjectField("refersTo")
 	c.RefersTo.marshalJSON(stream)
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for HasExtensions
 func (c *HasExtensions) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"extensions": false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "extensions":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -184,7 +260,6 @@ func (c *HasExtensions) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object hasExtensions", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -193,9 +268,12 @@ func (c *HasExtensions) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for HasExtensions
 func (c *HasExtensions) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("extensions")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Extensions {
 		k.marshalJSON(stream)
@@ -208,17 +286,16 @@ func (c *HasExtensions) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for Referable
 func (c *Referable) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"extensions": false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "extensions":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -247,7 +324,6 @@ func (c *Referable) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object referable", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -256,9 +332,12 @@ func (c *Referable) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for Referable
 func (c *Referable) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("extensions")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Extensions {
 		k.marshalJSON(stream)
@@ -268,37 +347,34 @@ func (c *Referable) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("idShort")
-	stream.WriteMore()
-
 	stream.WriteString(c.IdShort)
+	stream.WriteMore()
+
 	stream.WriteObjectField("displayName")
-	stream.WriteMore()
-
 	c.DisplayName.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("category")
-	stream.WriteMore()
-
 	stream.WriteString(c.Category)
-	stream.WriteObjectField("description")
 	stream.WriteMore()
 
+	stream.WriteObjectField("description")
 	c.Description.marshalJSON(stream)
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for Identifiable
 func (c *Identifiable) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"extensions": false,
 		"id":         false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "extensions":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -337,7 +413,6 @@ func (c *Identifiable) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object identifiable", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -346,9 +421,12 @@ func (c *Identifiable) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for Identifiable
 func (c *Identifiable) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("extensions")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Extensions {
 		k.marshalJSON(stream)
@@ -358,53 +436,50 @@ func (c *Identifiable) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("idShort")
-	stream.WriteMore()
-
 	stream.WriteString(c.IdShort)
+	stream.WriteMore()
+
 	stream.WriteObjectField("displayName")
-	stream.WriteMore()
-
 	c.DisplayName.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("category")
-	stream.WriteMore()
-
 	stream.WriteString(c.Category)
+	stream.WriteMore()
+
 	stream.WriteObjectField("description")
-	stream.WriteMore()
-
 	c.Description.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("id")
-	stream.WriteMore()
-
 	stream.WriteString(c.Id)
-	stream.WriteObjectField("administration")
 	stream.WriteMore()
 
+	stream.WriteObjectField("administration")
 	c.Administration.marshalJSON(stream)
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for ModelingKind
 func (e ModelingKind) unmarshalJSON(iter *json.Iterator) {
-	if next := iter.WhatIsNext(); next != json.StringValue {
-		iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.StringValue, got: %s", next))
-	}
 	raw := iter.ReadString()
 	if v, ok := ModelingKind_value[raw]; !ok {
-		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", v))
+		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", raw))
 	} else {
 		e = v
 	}
 }
 
+// marshalJSON implements the Marshaler interface for ModelingKind
 func (e ModelingKind) marshalJSON(stream *json.Stream) {
-	v := ModelingKind_name[e]
-	stream.WriteString(v)
+	stream.WriteString(ModelingKind_name[e])
 }
 
+// unmarshalJSON implements the Unmarshaler interface for HasKind
 func (c *HasKind) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "kind":
@@ -415,7 +490,6 @@ func (c *HasKind) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object hasKind", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -424,25 +498,26 @@ func (c *HasKind) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for HasKind
 func (c *HasKind) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("kind")
 	c.Kind.marshalJSON(stream)
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for HasDataSpecification
 func (c *HasDataSpecification) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"dataSpecifications": false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dataSpecifications":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Reference{}
 				myobj.unmarshalJSON(iter)
@@ -453,7 +528,6 @@ func (c *HasDataSpecification) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object hasDataSpecification", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -462,9 +536,12 @@ func (c *HasDataSpecification) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for HasDataSpecification
 func (c *HasDataSpecification) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("dataSpecifications")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.DataSpecifications {
 		k.marshalJSON(stream)
@@ -477,17 +554,16 @@ func (c *HasDataSpecification) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for AdministrativeInformation
 func (c *AdministrativeInformation) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"dataSpecifications": false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dataSpecifications":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Reference{}
 				myobj.unmarshalJSON(iter)
@@ -508,7 +584,6 @@ func (c *AdministrativeInformation) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object administrativeInformation", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -517,9 +592,12 @@ func (c *AdministrativeInformation) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for AdministrativeInformation
 func (c *AdministrativeInformation) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("dataSpecifications")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.DataSpecifications {
 		k.marshalJSON(stream)
@@ -529,27 +607,25 @@ func (c *AdministrativeInformation) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("version")
-	stream.WriteMore()
-
 	stream.WriteString(c.Version)
-	stream.WriteObjectField("revision")
 	stream.WriteMore()
 
+	stream.WriteObjectField("revision")
 	stream.WriteString(c.Revision)
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for Constraint
 func (c *Constraint) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		default:
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object constraint", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -558,23 +634,23 @@ func (c *Constraint) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for Constraint
 func (c *Constraint) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for Qualifiable
 func (c *Qualifiable) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"qualifiers": false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "qualifiers":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Constraint{}
 				myobj.unmarshalJSON(iter)
@@ -585,7 +661,6 @@ func (c *Qualifiable) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object qualifiable", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -594,9 +669,12 @@ func (c *Qualifiable) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for Qualifiable
 func (c *Qualifiable) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("qualifiers")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Qualifiers {
 		k.marshalJSON(stream)
@@ -609,12 +687,13 @@ func (c *Qualifiable) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for Qualifier
 func (c *Qualifier) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"type":      false,
 		"valueType": false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "semanticID":
@@ -645,7 +724,6 @@ func (c *Qualifier) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object qualifier", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -654,41 +732,40 @@ func (c *Qualifier) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for Qualifier
 func (c *Qualifier) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("semanticID")
 	c.SemanticId.marshalJSON(stream)
 	stream.WriteObjectField("type")
-	stream.WriteMore()
-
 	stream.WriteString(c.Type)
+	stream.WriteMore()
+
 	stream.WriteObjectField("valueType")
-	stream.WriteMore()
-
 	c.ValueType.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("value")
-	stream.WriteMore()
-
 	stream.WriteString(c.Value)
-	stream.WriteObjectField("valueID")
 	stream.WriteMore()
 
+	stream.WriteObjectField("valueID")
 	c.ValueId.marshalJSON(stream)
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for Formula
 func (c *Formula) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"dependsOn": false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dependsOn":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Reference{}
 				myobj.unmarshalJSON(iter)
@@ -699,7 +776,6 @@ func (c *Formula) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object formula", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -708,9 +784,12 @@ func (c *Formula) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for Formula
 func (c *Formula) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("dependsOn")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.DependsOn {
 		k.marshalJSON(stream)
@@ -723,6 +802,7 @@ func (c *Formula) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for AssetAdministrationShell
 func (c *AssetAdministrationShell) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"dataSpecifications": false,
@@ -731,13 +811,11 @@ func (c *AssetAdministrationShell) unmarshalJSON(iter *json.Iterator) {
 		"assetInformation":   false,
 		"submodels":          false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dataSpecifications":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Reference{}
 				myobj.unmarshalJSON(iter)
@@ -745,9 +823,7 @@ func (c *AssetAdministrationShell) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["dataSpecifications"] = true
 		case "extensions":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -789,9 +865,7 @@ func (c *AssetAdministrationShell) unmarshalJSON(iter *json.Iterator) {
 			isThere["assetInformation"] = true
 			c.AssetInformation = myobj
 		case "submodels":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 			}
 			isThere["submodels"] = true
@@ -799,7 +873,6 @@ func (c *AssetAdministrationShell) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object assetAdministrationShell", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -808,9 +881,12 @@ func (c *AssetAdministrationShell) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for AssetAdministrationShell
 func (c *AssetAdministrationShell) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("dataSpecifications")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.DataSpecifications {
 		k.marshalJSON(stream)
@@ -820,8 +896,7 @@ func (c *AssetAdministrationShell) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("extensions")
-	stream.WriteMore()
-
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Extensions {
 		k.marshalJSON(stream)
@@ -830,40 +905,41 @@ func (c *AssetAdministrationShell) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("idShort")
-	stream.WriteMore()
-
 	stream.WriteString(c.IdShort)
+	stream.WriteMore()
+
 	stream.WriteObjectField("displayName")
-	stream.WriteMore()
-
 	c.DisplayName.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("category")
-	stream.WriteMore()
-
 	stream.WriteString(c.Category)
+	stream.WriteMore()
+
 	stream.WriteObjectField("description")
-	stream.WriteMore()
-
 	c.Description.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("id")
-	stream.WriteMore()
-
 	stream.WriteString(c.Id)
-	stream.WriteObjectField("administration")
 	stream.WriteMore()
 
+	stream.WriteObjectField("administration")
 	c.Administration.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("derivedFrom")
 	stream.WriteMore()
 
 	stream.WriteObjectField("assetInformation")
-	stream.WriteMore()
-
 	c.AssetInformation.marshalJSON(stream)
-	stream.WriteObjectField("submodels")
 	stream.WriteMore()
 
+	stream.WriteObjectField("submodels")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Submodels {
 		k.marshalJSON(stream)
@@ -876,11 +952,12 @@ func (c *AssetAdministrationShell) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for AssetInformation
 func (c *AssetInformation) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"assetKind": false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "assetKind":
@@ -904,7 +981,6 @@ func (c *AssetInformation) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object assetInformation", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -913,49 +989,48 @@ func (c *AssetInformation) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for AssetInformation
 func (c *AssetInformation) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("assetKind")
 	c.AssetKind.marshalJSON(stream)
 	stream.WriteObjectField("globalAssetID")
-	stream.WriteMore()
-
 	c.GlobalAssetId.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("specificAssetID")
-	stream.WriteMore()
-
 	c.SpecificAssetId.marshalJSON(stream)
-	stream.WriteObjectField("defaultThumbnail")
 	stream.WriteMore()
 
+	stream.WriteObjectField("defaultThumbnail")
 	c.DefaultThumbnail.marshalJSON(stream)
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for AssetKind
 func (e AssetKind) unmarshalJSON(iter *json.Iterator) {
-	if next := iter.WhatIsNext(); next != json.StringValue {
-		iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.StringValue, got: %s", next))
-	}
 	raw := iter.ReadString()
 	if v, ok := AssetKind_value[raw]; !ok {
-		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", v))
+		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", raw))
 	} else {
 		e = v
 	}
 }
 
+// marshalJSON implements the Marshaler interface for AssetKind
 func (e AssetKind) marshalJSON(stream *json.Stream) {
-	v := AssetKind_name[e]
-	stream.WriteString(v)
+	stream.WriteString(AssetKind_name[e])
 }
 
+// unmarshalJSON implements the Unmarshaler interface for IdentifierKeyValuePair
 func (c *IdentifierKeyValuePair) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"key":   false,
 		"value": false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "semanticID":
@@ -982,7 +1057,6 @@ func (c *IdentifierKeyValuePair) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object identifierKeyValuePair", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -991,26 +1065,27 @@ func (c *IdentifierKeyValuePair) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for IdentifierKeyValuePair
 func (c *IdentifierKeyValuePair) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("semanticID")
 	c.SemanticId.marshalJSON(stream)
 	stream.WriteObjectField("key")
-	stream.WriteMore()
-
 	stream.WriteString(c.Key)
+	stream.WriteMore()
+
 	stream.WriteObjectField("value")
-	stream.WriteMore()
-
 	stream.WriteString(c.Value)
-	stream.WriteObjectField("externalSubjectID")
 	stream.WriteMore()
 
+	stream.WriteObjectField("externalSubjectID")
 	c.ExternalSubjectId.marshalJSON(stream)
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for Submodel
 func (c *Submodel) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"dataSpecifications": false,
@@ -1019,13 +1094,11 @@ func (c *Submodel) unmarshalJSON(iter *json.Iterator) {
 		"id":                 false,
 		"submodelElements":   false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dataSpecifications":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Reference{}
 				myobj.unmarshalJSON(iter)
@@ -1041,9 +1114,7 @@ func (c *Submodel) unmarshalJSON(iter *json.Iterator) {
 			myobj.unmarshalJSON(iter)
 			c.SemanticId = myobj
 		case "qualifiers":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Constraint{}
 				myobj.unmarshalJSON(iter)
@@ -1051,9 +1122,7 @@ func (c *Submodel) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["qualifiers"] = true
 		case "extensions":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -1089,9 +1158,7 @@ func (c *Submodel) unmarshalJSON(iter *json.Iterator) {
 			myobj.unmarshalJSON(iter)
 			c.Administration = myobj
 		case "submodelElements":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &SubmodelElement{}
 				myobj.unmarshalJSON(iter)
@@ -1102,7 +1169,6 @@ func (c *Submodel) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object submodel", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -1111,9 +1177,12 @@ func (c *Submodel) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for Submodel
 func (c *Submodel) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("dataSpecifications")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.DataSpecifications {
 		k.marshalJSON(stream)
@@ -1123,16 +1192,15 @@ func (c *Submodel) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("kind")
-	stream.WriteMore()
-
 	c.Kind.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("semanticID")
-	stream.WriteMore()
-
 	c.SemanticId.marshalJSON(stream)
-	stream.WriteObjectField("qualifiers")
 	stream.WriteMore()
 
+	stream.WriteObjectField("qualifiers")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Qualifiers {
 		k.marshalJSON(stream)
@@ -1141,9 +1209,10 @@ func (c *Submodel) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
-	stream.WriteObjectField("extensions")
 	stream.WriteMore()
 
+	stream.WriteObjectField("extensions")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Extensions {
 		k.marshalJSON(stream)
@@ -1152,33 +1221,34 @@ func (c *Submodel) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("idShort")
-	stream.WriteMore()
-
 	stream.WriteString(c.IdShort)
+	stream.WriteMore()
+
 	stream.WriteObjectField("displayName")
-	stream.WriteMore()
-
 	c.DisplayName.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("category")
-	stream.WriteMore()
-
 	stream.WriteString(c.Category)
+	stream.WriteMore()
+
 	stream.WriteObjectField("description")
-	stream.WriteMore()
-
 	c.Description.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("id")
-	stream.WriteMore()
-
 	stream.WriteString(c.Id)
+	stream.WriteMore()
+
 	stream.WriteObjectField("administration")
-	stream.WriteMore()
-
 	c.Administration.marshalJSON(stream)
-	stream.WriteObjectField("submodelElements")
 	stream.WriteMore()
 
+	stream.WriteObjectField("submodelElements")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.SubmodelElements {
 		k.marshalJSON(stream)
@@ -1191,19 +1261,18 @@ func (c *Submodel) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for SubmodelElement
 func (c *SubmodelElement) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"dataSpecifications": false,
 		"extensions":         false,
 		"qualifiers":         false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dataSpecifications":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Reference{}
 				myobj.unmarshalJSON(iter)
@@ -1211,9 +1280,7 @@ func (c *SubmodelElement) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["dataSpecifications"] = true
 		case "extensions":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -1247,9 +1314,7 @@ func (c *SubmodelElement) unmarshalJSON(iter *json.Iterator) {
 			myobj.unmarshalJSON(iter)
 			c.SemanticId = myobj
 		case "qualifiers":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Constraint{}
 				myobj.unmarshalJSON(iter)
@@ -1260,7 +1325,6 @@ func (c *SubmodelElement) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object submodelElement", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -1269,9 +1333,12 @@ func (c *SubmodelElement) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for SubmodelElement
 func (c *SubmodelElement) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("dataSpecifications")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.DataSpecifications {
 		k.marshalJSON(stream)
@@ -1281,8 +1348,7 @@ func (c *SubmodelElement) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("extensions")
-	stream.WriteMore()
-
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Extensions {
 		k.marshalJSON(stream)
@@ -1291,33 +1357,34 @@ func (c *SubmodelElement) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("idShort")
-	stream.WriteMore()
-
 	stream.WriteString(c.IdShort)
+	stream.WriteMore()
+
 	stream.WriteObjectField("displayName")
-	stream.WriteMore()
-
 	c.DisplayName.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("category")
-	stream.WriteMore()
-
 	stream.WriteString(c.Category)
+	stream.WriteMore()
+
 	stream.WriteObjectField("description")
-	stream.WriteMore()
-
 	c.Description.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("kind")
-	stream.WriteMore()
-
 	c.Kind.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("semanticID")
-	stream.WriteMore()
-
 	c.SemanticId.marshalJSON(stream)
-	stream.WriteObjectField("qualifiers")
 	stream.WriteMore()
 
+	stream.WriteObjectField("qualifiers")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Qualifiers {
 		k.marshalJSON(stream)
@@ -1330,6 +1397,7 @@ func (c *SubmodelElement) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for RelationshipElement
 func (c *RelationshipElement) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"dataSpecifications": false,
@@ -1338,13 +1406,11 @@ func (c *RelationshipElement) unmarshalJSON(iter *json.Iterator) {
 		"first":              false,
 		"second":             false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dataSpecifications":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Reference{}
 				myobj.unmarshalJSON(iter)
@@ -1352,9 +1418,7 @@ func (c *RelationshipElement) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["dataSpecifications"] = true
 		case "extensions":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -1388,9 +1452,7 @@ func (c *RelationshipElement) unmarshalJSON(iter *json.Iterator) {
 			myobj.unmarshalJSON(iter)
 			c.SemanticId = myobj
 		case "qualifiers":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Constraint{}
 				myobj.unmarshalJSON(iter)
@@ -1411,7 +1473,6 @@ func (c *RelationshipElement) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object relationshipElement", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -1420,9 +1481,12 @@ func (c *RelationshipElement) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for RelationshipElement
 func (c *RelationshipElement) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("dataSpecifications")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.DataSpecifications {
 		k.marshalJSON(stream)
@@ -1432,8 +1496,7 @@ func (c *RelationshipElement) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("extensions")
-	stream.WriteMore()
-
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Extensions {
 		k.marshalJSON(stream)
@@ -1442,33 +1505,34 @@ func (c *RelationshipElement) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("idShort")
-	stream.WriteMore()
-
 	stream.WriteString(c.IdShort)
+	stream.WriteMore()
+
 	stream.WriteObjectField("displayName")
-	stream.WriteMore()
-
 	c.DisplayName.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("category")
-	stream.WriteMore()
-
 	stream.WriteString(c.Category)
+	stream.WriteMore()
+
 	stream.WriteObjectField("description")
-	stream.WriteMore()
-
 	c.Description.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("kind")
-	stream.WriteMore()
-
 	c.Kind.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("semanticID")
-	stream.WriteMore()
-
 	c.SemanticId.marshalJSON(stream)
-	stream.WriteObjectField("qualifiers")
 	stream.WriteMore()
 
+	stream.WriteObjectField("qualifiers")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Qualifiers {
 		k.marshalJSON(stream)
@@ -1477,18 +1541,19 @@ func (c *RelationshipElement) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("first")
-	stream.WriteMore()
-
 	c.First.marshalJSON(stream)
-	stream.WriteObjectField("second")
 	stream.WriteMore()
 
+	stream.WriteObjectField("second")
 	c.Second.marshalJSON(stream)
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for SubmodelElementList
 func (c *SubmodelElementList) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"dataSpecifications":        false,
@@ -1497,13 +1562,11 @@ func (c *SubmodelElementList) unmarshalJSON(iter *json.Iterator) {
 		"submodelElementTypeValues": false,
 		"values":                    false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dataSpecifications":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Reference{}
 				myobj.unmarshalJSON(iter)
@@ -1511,9 +1574,7 @@ func (c *SubmodelElementList) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["dataSpecifications"] = true
 		case "extensions":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -1547,9 +1608,7 @@ func (c *SubmodelElementList) unmarshalJSON(iter *json.Iterator) {
 			myobj.unmarshalJSON(iter)
 			c.SemanticId = myobj
 		case "qualifiers":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Constraint{}
 				myobj.unmarshalJSON(iter)
@@ -1562,9 +1621,7 @@ func (c *SubmodelElementList) unmarshalJSON(iter *json.Iterator) {
 			c.SubmodelElementTypeValues = &myenum
 			isThere["submodelElementTypeValues"] = true
 		case "values":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &SubmodelElement{}
 				myobj.unmarshalJSON(iter)
@@ -1583,7 +1640,6 @@ func (c *SubmodelElementList) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object submodelElementList", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -1592,9 +1648,12 @@ func (c *SubmodelElementList) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for SubmodelElementList
 func (c *SubmodelElementList) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("dataSpecifications")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.DataSpecifications {
 		k.marshalJSON(stream)
@@ -1604,8 +1663,7 @@ func (c *SubmodelElementList) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("extensions")
-	stream.WriteMore()
-
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Extensions {
 		k.marshalJSON(stream)
@@ -1614,33 +1672,34 @@ func (c *SubmodelElementList) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("idShort")
-	stream.WriteMore()
-
 	stream.WriteString(c.IdShort)
+	stream.WriteMore()
+
 	stream.WriteObjectField("displayName")
-	stream.WriteMore()
-
 	c.DisplayName.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("category")
-	stream.WriteMore()
-
 	stream.WriteString(c.Category)
+	stream.WriteMore()
+
 	stream.WriteObjectField("description")
-	stream.WriteMore()
-
 	c.Description.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("kind")
-	stream.WriteMore()
-
 	c.Kind.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("semanticID")
-	stream.WriteMore()
-
 	c.SemanticId.marshalJSON(stream)
-	stream.WriteObjectField("qualifiers")
 	stream.WriteMore()
 
+	stream.WriteObjectField("qualifiers")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Qualifiers {
 		k.marshalJSON(stream)
@@ -1649,13 +1708,14 @@ func (c *SubmodelElementList) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("submodelElementTypeValues")
-	stream.WriteMore()
-
 	c.SubmodelElementTypeValues.marshalJSON(stream)
-	stream.WriteObjectField("values")
 	stream.WriteMore()
 
+	stream.WriteObjectField("values")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Values {
 		k.marshalJSON(stream)
@@ -1664,18 +1724,19 @@ func (c *SubmodelElementList) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("semanticIDValues")
-	stream.WriteMore()
-
 	c.SemanticIdValues.marshalJSON(stream)
-	stream.WriteObjectField("valueTypeValues")
 	stream.WriteMore()
 
+	stream.WriteObjectField("valueTypeValues")
 	c.ValueTypeValues.marshalJSON(stream)
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for SubmodelElementStruct
 func (c *SubmodelElementStruct) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"dataSpecifications": false,
@@ -1683,13 +1744,11 @@ func (c *SubmodelElementStruct) unmarshalJSON(iter *json.Iterator) {
 		"qualifiers":         false,
 		"values":             false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dataSpecifications":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Reference{}
 				myobj.unmarshalJSON(iter)
@@ -1697,9 +1756,7 @@ func (c *SubmodelElementStruct) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["dataSpecifications"] = true
 		case "extensions":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -1733,9 +1790,7 @@ func (c *SubmodelElementStruct) unmarshalJSON(iter *json.Iterator) {
 			myobj.unmarshalJSON(iter)
 			c.SemanticId = myobj
 		case "qualifiers":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Constraint{}
 				myobj.unmarshalJSON(iter)
@@ -1743,9 +1798,7 @@ func (c *SubmodelElementStruct) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["qualifiers"] = true
 		case "values":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &SubmodelElement{}
 				myobj.unmarshalJSON(iter)
@@ -1756,7 +1809,6 @@ func (c *SubmodelElementStruct) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object submodelElementStruct", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -1765,9 +1817,12 @@ func (c *SubmodelElementStruct) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for SubmodelElementStruct
 func (c *SubmodelElementStruct) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("dataSpecifications")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.DataSpecifications {
 		k.marshalJSON(stream)
@@ -1777,8 +1832,7 @@ func (c *SubmodelElementStruct) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("extensions")
-	stream.WriteMore()
-
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Extensions {
 		k.marshalJSON(stream)
@@ -1787,33 +1841,34 @@ func (c *SubmodelElementStruct) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("idShort")
-	stream.WriteMore()
-
 	stream.WriteString(c.IdShort)
+	stream.WriteMore()
+
 	stream.WriteObjectField("displayName")
-	stream.WriteMore()
-
 	c.DisplayName.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("category")
-	stream.WriteMore()
-
 	stream.WriteString(c.Category)
+	stream.WriteMore()
+
 	stream.WriteObjectField("description")
-	stream.WriteMore()
-
 	c.Description.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("kind")
-	stream.WriteMore()
-
 	c.Kind.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("semanticID")
-	stream.WriteMore()
-
 	c.SemanticId.marshalJSON(stream)
-	stream.WriteObjectField("qualifiers")
 	stream.WriteMore()
 
+	stream.WriteObjectField("qualifiers")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Qualifiers {
 		k.marshalJSON(stream)
@@ -1822,9 +1877,10 @@ func (c *SubmodelElementStruct) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
-	stream.WriteObjectField("values")
 	stream.WriteMore()
 
+	stream.WriteObjectField("values")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Values {
 		k.marshalJSON(stream)
@@ -1837,19 +1893,18 @@ func (c *SubmodelElementStruct) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for DataElement
 func (c *DataElement) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"dataSpecifications": false,
 		"extensions":         false,
 		"qualifiers":         false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dataSpecifications":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Reference{}
 				myobj.unmarshalJSON(iter)
@@ -1857,9 +1912,7 @@ func (c *DataElement) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["dataSpecifications"] = true
 		case "extensions":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -1893,9 +1946,7 @@ func (c *DataElement) unmarshalJSON(iter *json.Iterator) {
 			myobj.unmarshalJSON(iter)
 			c.SemanticId = myobj
 		case "qualifiers":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Constraint{}
 				myobj.unmarshalJSON(iter)
@@ -1906,7 +1957,6 @@ func (c *DataElement) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object dataElement", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -1915,9 +1965,12 @@ func (c *DataElement) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for DataElement
 func (c *DataElement) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("dataSpecifications")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.DataSpecifications {
 		k.marshalJSON(stream)
@@ -1927,8 +1980,7 @@ func (c *DataElement) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("extensions")
-	stream.WriteMore()
-
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Extensions {
 		k.marshalJSON(stream)
@@ -1937,33 +1989,34 @@ func (c *DataElement) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("idShort")
-	stream.WriteMore()
-
 	stream.WriteString(c.IdShort)
+	stream.WriteMore()
+
 	stream.WriteObjectField("displayName")
-	stream.WriteMore()
-
 	c.DisplayName.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("category")
-	stream.WriteMore()
-
 	stream.WriteString(c.Category)
+	stream.WriteMore()
+
 	stream.WriteObjectField("description")
-	stream.WriteMore()
-
 	c.Description.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("kind")
-	stream.WriteMore()
-
 	c.Kind.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("semanticID")
-	stream.WriteMore()
-
 	c.SemanticId.marshalJSON(stream)
-	stream.WriteObjectField("qualifiers")
 	stream.WriteMore()
 
+	stream.WriteObjectField("qualifiers")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Qualifiers {
 		k.marshalJSON(stream)
@@ -1976,6 +2029,7 @@ func (c *DataElement) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for Property
 func (c *Property) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"dataSpecifications": false,
@@ -1983,13 +2037,11 @@ func (c *Property) unmarshalJSON(iter *json.Iterator) {
 		"qualifiers":         false,
 		"valueType":          false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dataSpecifications":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Reference{}
 				myobj.unmarshalJSON(iter)
@@ -1997,9 +2049,7 @@ func (c *Property) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["dataSpecifications"] = true
 		case "extensions":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -2033,9 +2083,7 @@ func (c *Property) unmarshalJSON(iter *json.Iterator) {
 			myobj.unmarshalJSON(iter)
 			c.SemanticId = myobj
 		case "qualifiers":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Constraint{}
 				myobj.unmarshalJSON(iter)
@@ -2060,7 +2108,6 @@ func (c *Property) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object property", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -2069,9 +2116,12 @@ func (c *Property) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for Property
 func (c *Property) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("dataSpecifications")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.DataSpecifications {
 		k.marshalJSON(stream)
@@ -2081,8 +2131,7 @@ func (c *Property) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("extensions")
-	stream.WriteMore()
-
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Extensions {
 		k.marshalJSON(stream)
@@ -2091,33 +2140,34 @@ func (c *Property) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("idShort")
-	stream.WriteMore()
-
 	stream.WriteString(c.IdShort)
+	stream.WriteMore()
+
 	stream.WriteObjectField("displayName")
-	stream.WriteMore()
-
 	c.DisplayName.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("category")
-	stream.WriteMore()
-
 	stream.WriteString(c.Category)
+	stream.WriteMore()
+
 	stream.WriteObjectField("description")
-	stream.WriteMore()
-
 	c.Description.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("kind")
-	stream.WriteMore()
-
 	c.Kind.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("semanticID")
-	stream.WriteMore()
-
 	c.SemanticId.marshalJSON(stream)
-	stream.WriteObjectField("qualifiers")
 	stream.WriteMore()
 
+	stream.WriteObjectField("qualifiers")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Qualifiers {
 		k.marshalJSON(stream)
@@ -2126,35 +2176,34 @@ func (c *Property) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("valueType")
-	stream.WriteMore()
-
 	c.ValueType.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("value")
-	stream.WriteMore()
-
 	stream.WriteString(c.Value)
-	stream.WriteObjectField("valueID")
 	stream.WriteMore()
 
+	stream.WriteObjectField("valueID")
 	c.ValueId.marshalJSON(stream)
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for MultiLanguageProperty
 func (c *MultiLanguageProperty) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"dataSpecifications": false,
 		"extensions":         false,
 		"qualifiers":         false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dataSpecifications":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Reference{}
 				myobj.unmarshalJSON(iter)
@@ -2162,9 +2211,7 @@ func (c *MultiLanguageProperty) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["dataSpecifications"] = true
 		case "extensions":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -2198,9 +2245,7 @@ func (c *MultiLanguageProperty) unmarshalJSON(iter *json.Iterator) {
 			myobj.unmarshalJSON(iter)
 			c.SemanticId = myobj
 		case "qualifiers":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Constraint{}
 				myobj.unmarshalJSON(iter)
@@ -2219,7 +2264,6 @@ func (c *MultiLanguageProperty) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object multiLanguageProperty", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -2228,9 +2272,12 @@ func (c *MultiLanguageProperty) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for MultiLanguageProperty
 func (c *MultiLanguageProperty) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("dataSpecifications")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.DataSpecifications {
 		k.marshalJSON(stream)
@@ -2240,8 +2287,7 @@ func (c *MultiLanguageProperty) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("extensions")
-	stream.WriteMore()
-
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Extensions {
 		k.marshalJSON(stream)
@@ -2250,33 +2296,34 @@ func (c *MultiLanguageProperty) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("idShort")
-	stream.WriteMore()
-
 	stream.WriteString(c.IdShort)
+	stream.WriteMore()
+
 	stream.WriteObjectField("displayName")
-	stream.WriteMore()
-
 	c.DisplayName.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("category")
-	stream.WriteMore()
-
 	stream.WriteString(c.Category)
+	stream.WriteMore()
+
 	stream.WriteObjectField("description")
-	stream.WriteMore()
-
 	c.Description.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("kind")
-	stream.WriteMore()
-
 	c.Kind.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("semanticID")
-	stream.WriteMore()
-
 	c.SemanticId.marshalJSON(stream)
-	stream.WriteObjectField("qualifiers")
 	stream.WriteMore()
 
+	stream.WriteObjectField("qualifiers")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Qualifiers {
 		k.marshalJSON(stream)
@@ -2285,18 +2332,19 @@ func (c *MultiLanguageProperty) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("translatable")
-	stream.WriteMore()
-
 	c.Translatable.marshalJSON(stream)
-	stream.WriteObjectField("valueID")
 	stream.WriteMore()
 
+	stream.WriteObjectField("valueID")
 	c.ValueId.marshalJSON(stream)
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for Range
 func (c *Range) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"dataSpecifications": false,
@@ -2304,13 +2352,11 @@ func (c *Range) unmarshalJSON(iter *json.Iterator) {
 		"qualifiers":         false,
 		"valueType":          false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dataSpecifications":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Reference{}
 				myobj.unmarshalJSON(iter)
@@ -2318,9 +2364,7 @@ func (c *Range) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["dataSpecifications"] = true
 		case "extensions":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -2354,9 +2398,7 @@ func (c *Range) unmarshalJSON(iter *json.Iterator) {
 			myobj.unmarshalJSON(iter)
 			c.SemanticId = myobj
 		case "qualifiers":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Constraint{}
 				myobj.unmarshalJSON(iter)
@@ -2382,7 +2424,6 @@ func (c *Range) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object range", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -2391,9 +2432,12 @@ func (c *Range) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for Range
 func (c *Range) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("dataSpecifications")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.DataSpecifications {
 		k.marshalJSON(stream)
@@ -2403,8 +2447,7 @@ func (c *Range) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("extensions")
-	stream.WriteMore()
-
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Extensions {
 		k.marshalJSON(stream)
@@ -2413,33 +2456,34 @@ func (c *Range) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("idShort")
-	stream.WriteMore()
-
 	stream.WriteString(c.IdShort)
+	stream.WriteMore()
+
 	stream.WriteObjectField("displayName")
-	stream.WriteMore()
-
 	c.DisplayName.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("category")
-	stream.WriteMore()
-
 	stream.WriteString(c.Category)
+	stream.WriteMore()
+
 	stream.WriteObjectField("description")
-	stream.WriteMore()
-
 	c.Description.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("kind")
-	stream.WriteMore()
-
 	c.Kind.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("semanticID")
-	stream.WriteMore()
-
 	c.SemanticId.marshalJSON(stream)
-	stream.WriteObjectField("qualifiers")
 	stream.WriteMore()
 
+	stream.WriteObjectField("qualifiers")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Qualifiers {
 		k.marshalJSON(stream)
@@ -2448,35 +2492,34 @@ func (c *Range) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("valueType")
-	stream.WriteMore()
-
 	c.ValueType.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("min")
-	stream.WriteMore()
-
 	stream.WriteString(c.Min)
-	stream.WriteObjectField("max")
 	stream.WriteMore()
 
+	stream.WriteObjectField("max")
 	stream.WriteString(c.Max)
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for ReferenceElement
 func (c *ReferenceElement) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"dataSpecifications": false,
 		"extensions":         false,
 		"qualifiers":         false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dataSpecifications":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Reference{}
 				myobj.unmarshalJSON(iter)
@@ -2484,9 +2527,7 @@ func (c *ReferenceElement) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["dataSpecifications"] = true
 		case "extensions":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -2520,9 +2561,7 @@ func (c *ReferenceElement) unmarshalJSON(iter *json.Iterator) {
 			myobj.unmarshalJSON(iter)
 			c.SemanticId = myobj
 		case "qualifiers":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Constraint{}
 				myobj.unmarshalJSON(iter)
@@ -2537,7 +2576,6 @@ func (c *ReferenceElement) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object referenceElement", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -2546,9 +2584,12 @@ func (c *ReferenceElement) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for ReferenceElement
 func (c *ReferenceElement) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("dataSpecifications")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.DataSpecifications {
 		k.marshalJSON(stream)
@@ -2558,8 +2599,7 @@ func (c *ReferenceElement) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("extensions")
-	stream.WriteMore()
-
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Extensions {
 		k.marshalJSON(stream)
@@ -2568,33 +2608,34 @@ func (c *ReferenceElement) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("idShort")
-	stream.WriteMore()
-
 	stream.WriteString(c.IdShort)
+	stream.WriteMore()
+
 	stream.WriteObjectField("displayName")
-	stream.WriteMore()
-
 	c.DisplayName.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("category")
-	stream.WriteMore()
-
 	stream.WriteString(c.Category)
+	stream.WriteMore()
+
 	stream.WriteObjectField("description")
-	stream.WriteMore()
-
 	c.Description.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("kind")
-	stream.WriteMore()
-
 	c.Kind.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("semanticID")
-	stream.WriteMore()
-
 	c.SemanticId.marshalJSON(stream)
-	stream.WriteObjectField("qualifiers")
 	stream.WriteMore()
 
+	stream.WriteObjectField("qualifiers")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Qualifiers {
 		k.marshalJSON(stream)
@@ -2603,14 +2644,15 @@ func (c *ReferenceElement) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
-	stream.WriteObjectField("reference")
 	stream.WriteMore()
 
+	stream.WriteObjectField("reference")
 	c.Reference.marshalJSON(stream)
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for Blob
 func (c *Blob) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"dataSpecifications": false,
@@ -2618,13 +2660,11 @@ func (c *Blob) unmarshalJSON(iter *json.Iterator) {
 		"qualifiers":         false,
 		"mimeType":           false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dataSpecifications":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Reference{}
 				myobj.unmarshalJSON(iter)
@@ -2632,9 +2672,7 @@ func (c *Blob) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["dataSpecifications"] = true
 		case "extensions":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -2668,9 +2706,7 @@ func (c *Blob) unmarshalJSON(iter *json.Iterator) {
 			myobj.unmarshalJSON(iter)
 			c.SemanticId = myobj
 		case "qualifiers":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Constraint{}
 				myobj.unmarshalJSON(iter)
@@ -2692,7 +2728,6 @@ func (c *Blob) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object blob", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -2701,9 +2736,12 @@ func (c *Blob) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for Blob
 func (c *Blob) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("dataSpecifications")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.DataSpecifications {
 		k.marshalJSON(stream)
@@ -2713,8 +2751,7 @@ func (c *Blob) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("extensions")
-	stream.WriteMore()
-
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Extensions {
 		k.marshalJSON(stream)
@@ -2723,33 +2760,34 @@ func (c *Blob) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("idShort")
-	stream.WriteMore()
-
 	stream.WriteString(c.IdShort)
+	stream.WriteMore()
+
 	stream.WriteObjectField("displayName")
-	stream.WriteMore()
-
 	c.DisplayName.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("category")
-	stream.WriteMore()
-
 	stream.WriteString(c.Category)
+	stream.WriteMore()
+
 	stream.WriteObjectField("description")
-	stream.WriteMore()
-
 	c.Description.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("kind")
-	stream.WriteMore()
-
 	c.Kind.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("semanticID")
-	stream.WriteMore()
-
 	c.SemanticId.marshalJSON(stream)
-	stream.WriteObjectField("qualifiers")
 	stream.WriteMore()
 
+	stream.WriteObjectField("qualifiers")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Qualifiers {
 		k.marshalJSON(stream)
@@ -2758,18 +2796,19 @@ func (c *Blob) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("mimeType")
-	stream.WriteMore()
-
 	stream.WriteString(c.MimeType)
-	stream.WriteObjectField("content")
 	stream.WriteMore()
 
+	stream.WriteObjectField("content")
 	stream.WriteString(c.Content)
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for File
 func (c *File) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"dataSpecifications": false,
@@ -2777,13 +2816,11 @@ func (c *File) unmarshalJSON(iter *json.Iterator) {
 		"qualifiers":         false,
 		"mimeType":           false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dataSpecifications":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Reference{}
 				myobj.unmarshalJSON(iter)
@@ -2791,9 +2828,7 @@ func (c *File) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["dataSpecifications"] = true
 		case "extensions":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -2827,9 +2862,7 @@ func (c *File) unmarshalJSON(iter *json.Iterator) {
 			myobj.unmarshalJSON(iter)
 			c.SemanticId = myobj
 		case "qualifiers":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Constraint{}
 				myobj.unmarshalJSON(iter)
@@ -2851,7 +2884,6 @@ func (c *File) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object file", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -2860,9 +2892,12 @@ func (c *File) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for File
 func (c *File) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("dataSpecifications")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.DataSpecifications {
 		k.marshalJSON(stream)
@@ -2872,8 +2907,7 @@ func (c *File) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("extensions")
-	stream.WriteMore()
-
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Extensions {
 		k.marshalJSON(stream)
@@ -2882,33 +2916,34 @@ func (c *File) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("idShort")
-	stream.WriteMore()
-
 	stream.WriteString(c.IdShort)
+	stream.WriteMore()
+
 	stream.WriteObjectField("displayName")
-	stream.WriteMore()
-
 	c.DisplayName.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("category")
-	stream.WriteMore()
-
 	stream.WriteString(c.Category)
+	stream.WriteMore()
+
 	stream.WriteObjectField("description")
-	stream.WriteMore()
-
 	c.Description.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("kind")
-	stream.WriteMore()
-
 	c.Kind.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("semanticID")
-	stream.WriteMore()
-
 	c.SemanticId.marshalJSON(stream)
-	stream.WriteObjectField("qualifiers")
 	stream.WriteMore()
 
+	stream.WriteObjectField("qualifiers")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Qualifiers {
 		k.marshalJSON(stream)
@@ -2917,18 +2952,19 @@ func (c *File) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("mimeType")
-	stream.WriteMore()
-
 	stream.WriteString(c.MimeType)
-	stream.WriteObjectField("value")
 	stream.WriteMore()
 
+	stream.WriteObjectField("value")
 	stream.WriteString(c.Value)
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for AnnotatedRelationshipElement
 func (c *AnnotatedRelationshipElement) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"dataSpecifications": false,
@@ -2938,13 +2974,11 @@ func (c *AnnotatedRelationshipElement) unmarshalJSON(iter *json.Iterator) {
 		"second":             false,
 		"annotation":         false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dataSpecifications":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Reference{}
 				myobj.unmarshalJSON(iter)
@@ -2952,9 +2986,7 @@ func (c *AnnotatedRelationshipElement) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["dataSpecifications"] = true
 		case "extensions":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -2988,9 +3020,7 @@ func (c *AnnotatedRelationshipElement) unmarshalJSON(iter *json.Iterator) {
 			myobj.unmarshalJSON(iter)
 			c.SemanticId = myobj
 		case "qualifiers":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Constraint{}
 				myobj.unmarshalJSON(iter)
@@ -3008,9 +3038,7 @@ func (c *AnnotatedRelationshipElement) unmarshalJSON(iter *json.Iterator) {
 			isThere["second"] = true
 			c.Second = myobj
 		case "annotation":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &DataElement{}
 				myobj.unmarshalJSON(iter)
@@ -3021,7 +3049,6 @@ func (c *AnnotatedRelationshipElement) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object annotatedRelationshipElement", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -3030,9 +3057,12 @@ func (c *AnnotatedRelationshipElement) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for AnnotatedRelationshipElement
 func (c *AnnotatedRelationshipElement) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("dataSpecifications")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.DataSpecifications {
 		k.marshalJSON(stream)
@@ -3042,8 +3072,7 @@ func (c *AnnotatedRelationshipElement) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("extensions")
-	stream.WriteMore()
-
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Extensions {
 		k.marshalJSON(stream)
@@ -3052,33 +3081,34 @@ func (c *AnnotatedRelationshipElement) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("idShort")
-	stream.WriteMore()
-
 	stream.WriteString(c.IdShort)
+	stream.WriteMore()
+
 	stream.WriteObjectField("displayName")
-	stream.WriteMore()
-
 	c.DisplayName.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("category")
-	stream.WriteMore()
-
 	stream.WriteString(c.Category)
+	stream.WriteMore()
+
 	stream.WriteObjectField("description")
-	stream.WriteMore()
-
 	c.Description.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("kind")
-	stream.WriteMore()
-
 	c.Kind.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("semanticID")
-	stream.WriteMore()
-
 	c.SemanticId.marshalJSON(stream)
-	stream.WriteObjectField("qualifiers")
 	stream.WriteMore()
 
+	stream.WriteObjectField("qualifiers")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Qualifiers {
 		k.marshalJSON(stream)
@@ -3087,17 +3117,18 @@ func (c *AnnotatedRelationshipElement) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("first")
-	stream.WriteMore()
-
 	c.First.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("second")
-	stream.WriteMore()
-
 	c.Second.marshalJSON(stream)
-	stream.WriteObjectField("annotation")
 	stream.WriteMore()
 
+	stream.WriteObjectField("annotation")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Annotation {
 		k.marshalJSON(stream)
@@ -3110,23 +3141,22 @@ func (c *AnnotatedRelationshipElement) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for EntityType
 func (e EntityType) unmarshalJSON(iter *json.Iterator) {
-	if next := iter.WhatIsNext(); next != json.StringValue {
-		iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.StringValue, got: %s", next))
-	}
 	raw := iter.ReadString()
 	if v, ok := EntityType_value[raw]; !ok {
-		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", v))
+		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", raw))
 	} else {
 		e = v
 	}
 }
 
+// marshalJSON implements the Marshaler interface for EntityType
 func (e EntityType) marshalJSON(stream *json.Stream) {
-	v := EntityType_name[e]
-	stream.WriteString(v)
+	stream.WriteString(EntityType_name[e])
 }
 
+// unmarshalJSON implements the Unmarshaler interface for Entity
 func (c *Entity) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"dataSpecifications": false,
@@ -3135,13 +3165,11 @@ func (c *Entity) unmarshalJSON(iter *json.Iterator) {
 		"entityType":         false,
 		"statements":         false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dataSpecifications":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Reference{}
 				myobj.unmarshalJSON(iter)
@@ -3149,9 +3177,7 @@ func (c *Entity) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["dataSpecifications"] = true
 		case "extensions":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -3185,9 +3211,7 @@ func (c *Entity) unmarshalJSON(iter *json.Iterator) {
 			myobj.unmarshalJSON(iter)
 			c.SemanticId = myobj
 		case "qualifiers":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Constraint{}
 				myobj.unmarshalJSON(iter)
@@ -3200,9 +3224,7 @@ func (c *Entity) unmarshalJSON(iter *json.Iterator) {
 			c.EntityType = &myenum
 			isThere["entityType"] = true
 		case "statements":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &SubmodelElement{}
 				myobj.unmarshalJSON(iter)
@@ -3221,7 +3243,6 @@ func (c *Entity) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object entity", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -3230,9 +3251,12 @@ func (c *Entity) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for Entity
 func (c *Entity) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("dataSpecifications")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.DataSpecifications {
 		k.marshalJSON(stream)
@@ -3242,8 +3266,7 @@ func (c *Entity) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("extensions")
-	stream.WriteMore()
-
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Extensions {
 		k.marshalJSON(stream)
@@ -3252,33 +3275,34 @@ func (c *Entity) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("idShort")
-	stream.WriteMore()
-
 	stream.WriteString(c.IdShort)
+	stream.WriteMore()
+
 	stream.WriteObjectField("displayName")
-	stream.WriteMore()
-
 	c.DisplayName.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("category")
-	stream.WriteMore()
-
 	stream.WriteString(c.Category)
+	stream.WriteMore()
+
 	stream.WriteObjectField("description")
-	stream.WriteMore()
-
 	c.Description.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("kind")
-	stream.WriteMore()
-
 	c.Kind.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("semanticID")
-	stream.WriteMore()
-
 	c.SemanticId.marshalJSON(stream)
-	stream.WriteObjectField("qualifiers")
 	stream.WriteMore()
 
+	stream.WriteObjectField("qualifiers")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Qualifiers {
 		k.marshalJSON(stream)
@@ -3287,13 +3311,14 @@ func (c *Entity) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("entityType")
-	stream.WriteMore()
-
 	c.EntityType.marshalJSON(stream)
-	stream.WriteObjectField("statements")
 	stream.WriteMore()
 
+	stream.WriteObjectField("statements")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Statements {
 		k.marshalJSON(stream)
@@ -3302,31 +3327,30 @@ func (c *Entity) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("globalAssetID")
-	stream.WriteMore()
-
 	c.GlobalAssetId.marshalJSON(stream)
-	stream.WriteObjectField("specificAssetID")
 	stream.WriteMore()
 
+	stream.WriteObjectField("specificAssetID")
 	c.SpecificAssetId.marshalJSON(stream)
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for Event
 func (c *Event) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"dataSpecifications": false,
 		"extensions":         false,
 		"qualifiers":         false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dataSpecifications":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Reference{}
 				myobj.unmarshalJSON(iter)
@@ -3334,9 +3358,7 @@ func (c *Event) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["dataSpecifications"] = true
 		case "extensions":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -3370,9 +3392,7 @@ func (c *Event) unmarshalJSON(iter *json.Iterator) {
 			myobj.unmarshalJSON(iter)
 			c.SemanticId = myobj
 		case "qualifiers":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Constraint{}
 				myobj.unmarshalJSON(iter)
@@ -3383,7 +3403,6 @@ func (c *Event) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object event", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -3392,9 +3411,12 @@ func (c *Event) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for Event
 func (c *Event) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("dataSpecifications")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.DataSpecifications {
 		k.marshalJSON(stream)
@@ -3404,8 +3426,7 @@ func (c *Event) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("extensions")
-	stream.WriteMore()
-
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Extensions {
 		k.marshalJSON(stream)
@@ -3414,33 +3435,34 @@ func (c *Event) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("idShort")
-	stream.WriteMore()
-
 	stream.WriteString(c.IdShort)
+	stream.WriteMore()
+
 	stream.WriteObjectField("displayName")
-	stream.WriteMore()
-
 	c.DisplayName.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("category")
-	stream.WriteMore()
-
 	stream.WriteString(c.Category)
+	stream.WriteMore()
+
 	stream.WriteObjectField("description")
-	stream.WriteMore()
-
 	c.Description.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("kind")
-	stream.WriteMore()
-
 	c.Kind.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("semanticID")
-	stream.WriteMore()
-
 	c.SemanticId.marshalJSON(stream)
-	stream.WriteObjectField("qualifiers")
 	stream.WriteMore()
 
+	stream.WriteObjectField("qualifiers")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Qualifiers {
 		k.marshalJSON(stream)
@@ -3453,6 +3475,7 @@ func (c *Event) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for BasicEvent
 func (c *BasicEvent) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"dataSpecifications": false,
@@ -3460,13 +3483,11 @@ func (c *BasicEvent) unmarshalJSON(iter *json.Iterator) {
 		"qualifiers":         false,
 		"observed":           false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dataSpecifications":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Reference{}
 				myobj.unmarshalJSON(iter)
@@ -3474,9 +3495,7 @@ func (c *BasicEvent) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["dataSpecifications"] = true
 		case "extensions":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -3510,9 +3529,7 @@ func (c *BasicEvent) unmarshalJSON(iter *json.Iterator) {
 			myobj.unmarshalJSON(iter)
 			c.SemanticId = myobj
 		case "qualifiers":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Constraint{}
 				myobj.unmarshalJSON(iter)
@@ -3524,7 +3541,6 @@ func (c *BasicEvent) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object basicEvent", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -3533,9 +3549,12 @@ func (c *BasicEvent) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for BasicEvent
 func (c *BasicEvent) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("dataSpecifications")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.DataSpecifications {
 		k.marshalJSON(stream)
@@ -3545,8 +3564,7 @@ func (c *BasicEvent) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("extensions")
-	stream.WriteMore()
-
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Extensions {
 		k.marshalJSON(stream)
@@ -3555,33 +3573,34 @@ func (c *BasicEvent) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("idShort")
-	stream.WriteMore()
-
 	stream.WriteString(c.IdShort)
+	stream.WriteMore()
+
 	stream.WriteObjectField("displayName")
-	stream.WriteMore()
-
 	c.DisplayName.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("category")
-	stream.WriteMore()
-
 	stream.WriteString(c.Category)
+	stream.WriteMore()
+
 	stream.WriteObjectField("description")
-	stream.WriteMore()
-
 	c.Description.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("kind")
-	stream.WriteMore()
-
 	c.Kind.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("semanticID")
-	stream.WriteMore()
-
 	c.SemanticId.marshalJSON(stream)
-	stream.WriteObjectField("qualifiers")
 	stream.WriteMore()
 
+	stream.WriteObjectField("qualifiers")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Qualifiers {
 		k.marshalJSON(stream)
@@ -3590,12 +3609,14 @@ func (c *BasicEvent) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
-	stream.WriteObjectField("observed")
 	stream.WriteMore()
+
+	stream.WriteObjectField("observed")
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for Operation
 func (c *Operation) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"dataSpecifications": false,
@@ -3605,13 +3626,11 @@ func (c *Operation) unmarshalJSON(iter *json.Iterator) {
 		"outputVariables":    false,
 		"inoutputVariables":  false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dataSpecifications":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Reference{}
 				myobj.unmarshalJSON(iter)
@@ -3619,9 +3638,7 @@ func (c *Operation) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["dataSpecifications"] = true
 		case "extensions":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -3655,9 +3672,7 @@ func (c *Operation) unmarshalJSON(iter *json.Iterator) {
 			myobj.unmarshalJSON(iter)
 			c.SemanticId = myobj
 		case "qualifiers":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Constraint{}
 				myobj.unmarshalJSON(iter)
@@ -3665,9 +3680,7 @@ func (c *Operation) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["qualifiers"] = true
 		case "inputVariables":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &OperationVariable{}
 				myobj.unmarshalJSON(iter)
@@ -3675,9 +3688,7 @@ func (c *Operation) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["inputVariables"] = true
 		case "outputVariables":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &OperationVariable{}
 				myobj.unmarshalJSON(iter)
@@ -3685,9 +3696,7 @@ func (c *Operation) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["outputVariables"] = true
 		case "inoutputVariables":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &OperationVariable{}
 				myobj.unmarshalJSON(iter)
@@ -3698,7 +3707,6 @@ func (c *Operation) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object operation", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -3707,9 +3715,12 @@ func (c *Operation) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for Operation
 func (c *Operation) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("dataSpecifications")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.DataSpecifications {
 		k.marshalJSON(stream)
@@ -3719,8 +3730,7 @@ func (c *Operation) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("extensions")
-	stream.WriteMore()
-
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Extensions {
 		k.marshalJSON(stream)
@@ -3729,33 +3739,34 @@ func (c *Operation) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("idShort")
-	stream.WriteMore()
-
 	stream.WriteString(c.IdShort)
+	stream.WriteMore()
+
 	stream.WriteObjectField("displayName")
-	stream.WriteMore()
-
 	c.DisplayName.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("category")
-	stream.WriteMore()
-
 	stream.WriteString(c.Category)
+	stream.WriteMore()
+
 	stream.WriteObjectField("description")
-	stream.WriteMore()
-
 	c.Description.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("kind")
-	stream.WriteMore()
-
 	c.Kind.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("semanticID")
-	stream.WriteMore()
-
 	c.SemanticId.marshalJSON(stream)
-	stream.WriteObjectField("qualifiers")
 	stream.WriteMore()
 
+	stream.WriteObjectField("qualifiers")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Qualifiers {
 		k.marshalJSON(stream)
@@ -3764,9 +3775,10 @@ func (c *Operation) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
-	stream.WriteObjectField("inputVariables")
 	stream.WriteMore()
 
+	stream.WriteObjectField("inputVariables")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.InputVariables {
 		k.marshalJSON(stream)
@@ -3775,9 +3787,10 @@ func (c *Operation) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
-	stream.WriteObjectField("outputVariables")
 	stream.WriteMore()
 
+	stream.WriteObjectField("outputVariables")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.OutputVariables {
 		k.marshalJSON(stream)
@@ -3786,9 +3799,10 @@ func (c *Operation) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
-	stream.WriteObjectField("inoutputVariables")
 	stream.WriteMore()
 
+	stream.WriteObjectField("inoutputVariables")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.InoutputVariables {
 		k.marshalJSON(stream)
@@ -3801,11 +3815,12 @@ func (c *Operation) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for OperationVariable
 func (c *OperationVariable) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"value": false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "value":
@@ -3817,7 +3832,6 @@ func (c *OperationVariable) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object operationVariable", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -3826,27 +3840,28 @@ func (c *OperationVariable) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for OperationVariable
 func (c *OperationVariable) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("value")
 	c.Value.marshalJSON(stream)
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for Capability
 func (c *Capability) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"dataSpecifications": false,
 		"extensions":         false,
 		"qualifiers":         false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dataSpecifications":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Reference{}
 				myobj.unmarshalJSON(iter)
@@ -3854,9 +3869,7 @@ func (c *Capability) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["dataSpecifications"] = true
 		case "extensions":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -3890,9 +3903,7 @@ func (c *Capability) unmarshalJSON(iter *json.Iterator) {
 			myobj.unmarshalJSON(iter)
 			c.SemanticId = myobj
 		case "qualifiers":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Constraint{}
 				myobj.unmarshalJSON(iter)
@@ -3903,7 +3914,6 @@ func (c *Capability) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object capability", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -3912,9 +3922,12 @@ func (c *Capability) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for Capability
 func (c *Capability) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("dataSpecifications")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.DataSpecifications {
 		k.marshalJSON(stream)
@@ -3924,8 +3937,7 @@ func (c *Capability) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("extensions")
-	stream.WriteMore()
-
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Extensions {
 		k.marshalJSON(stream)
@@ -3934,33 +3946,34 @@ func (c *Capability) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("idShort")
-	stream.WriteMore()
-
 	stream.WriteString(c.IdShort)
+	stream.WriteMore()
+
 	stream.WriteObjectField("displayName")
-	stream.WriteMore()
-
 	c.DisplayName.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("category")
-	stream.WriteMore()
-
 	stream.WriteString(c.Category)
+	stream.WriteMore()
+
 	stream.WriteObjectField("description")
-	stream.WriteMore()
-
 	c.Description.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("kind")
-	stream.WriteMore()
-
 	c.Kind.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("semanticID")
-	stream.WriteMore()
-
 	c.SemanticId.marshalJSON(stream)
-	stream.WriteObjectField("qualifiers")
 	stream.WriteMore()
 
+	stream.WriteObjectField("qualifiers")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Qualifiers {
 		k.marshalJSON(stream)
@@ -3973,6 +3986,7 @@ func (c *Capability) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for ConceptDescription
 func (c *ConceptDescription) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"dataSpecifications": false,
@@ -3980,13 +3994,11 @@ func (c *ConceptDescription) unmarshalJSON(iter *json.Iterator) {
 		"id":                 false,
 		"isCaseOf":           false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dataSpecifications":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Reference{}
 				myobj.unmarshalJSON(iter)
@@ -3994,9 +4006,7 @@ func (c *ConceptDescription) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["dataSpecifications"] = true
 		case "extensions":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -4032,9 +4042,7 @@ func (c *ConceptDescription) unmarshalJSON(iter *json.Iterator) {
 			myobj.unmarshalJSON(iter)
 			c.Administration = myobj
 		case "isCaseOf":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Reference{}
 				myobj.unmarshalJSON(iter)
@@ -4045,7 +4053,6 @@ func (c *ConceptDescription) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object conceptDescription", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -4054,9 +4061,12 @@ func (c *ConceptDescription) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for ConceptDescription
 func (c *ConceptDescription) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("dataSpecifications")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.DataSpecifications {
 		k.marshalJSON(stream)
@@ -4066,8 +4076,7 @@ func (c *ConceptDescription) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("extensions")
-	stream.WriteMore()
-
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Extensions {
 		k.marshalJSON(stream)
@@ -4076,33 +4085,34 @@ func (c *ConceptDescription) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("idShort")
-	stream.WriteMore()
-
 	stream.WriteString(c.IdShort)
+	stream.WriteMore()
+
 	stream.WriteObjectField("displayName")
-	stream.WriteMore()
-
 	c.DisplayName.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("category")
-	stream.WriteMore()
-
 	stream.WriteString(c.Category)
+	stream.WriteMore()
+
 	stream.WriteObjectField("description")
-	stream.WriteMore()
-
 	c.Description.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("id")
-	stream.WriteMore()
-
 	stream.WriteString(c.Id)
+	stream.WriteMore()
+
 	stream.WriteObjectField("administration")
-	stream.WriteMore()
-
 	c.Administration.marshalJSON(stream)
-	stream.WriteObjectField("isCaseOf")
 	stream.WriteMore()
 
+	stream.WriteObjectField("isCaseOf")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.IsCaseOf {
 		k.marshalJSON(stream)
@@ -4115,19 +4125,18 @@ func (c *ConceptDescription) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for View
 func (c *View) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"dataSpecifications": false,
 		"extensions":         false,
 		"containedElements":  false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dataSpecifications":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Reference{}
 				myobj.unmarshalJSON(iter)
@@ -4135,9 +4144,7 @@ func (c *View) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["dataSpecifications"] = true
 		case "extensions":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -4167,9 +4174,7 @@ func (c *View) unmarshalJSON(iter *json.Iterator) {
 			myobj.unmarshalJSON(iter)
 			c.SemanticId = myobj
 		case "containedElements":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 			}
 			isThere["containedElements"] = true
@@ -4177,7 +4182,6 @@ func (c *View) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object view", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -4186,9 +4190,12 @@ func (c *View) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for View
 func (c *View) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("dataSpecifications")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.DataSpecifications {
 		k.marshalJSON(stream)
@@ -4198,8 +4205,7 @@ func (c *View) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("extensions")
-	stream.WriteMore()
-
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Extensions {
 		k.marshalJSON(stream)
@@ -4208,29 +4214,30 @@ func (c *View) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
+	stream.WriteMore()
+
 	stream.WriteObjectField("idShort")
-	stream.WriteMore()
-
 	stream.WriteString(c.IdShort)
+	stream.WriteMore()
+
 	stream.WriteObjectField("displayName")
-	stream.WriteMore()
-
 	c.DisplayName.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("category")
-	stream.WriteMore()
-
 	stream.WriteString(c.Category)
+	stream.WriteMore()
+
 	stream.WriteObjectField("description")
-	stream.WriteMore()
-
 	c.Description.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("semanticID")
-	stream.WriteMore()
-
 	c.SemanticId.marshalJSON(stream)
-	stream.WriteObjectField("containedElements")
 	stream.WriteMore()
 
+	stream.WriteObjectField("containedElements")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.ContainedElements {
 		k.marshalJSON(stream)
@@ -4243,16 +4250,16 @@ func (c *View) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for Reference
 func (c *Reference) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		default:
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object reference", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -4261,23 +4268,23 @@ func (c *Reference) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for Reference
 func (c *Reference) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for GlobalReference
 func (c *GlobalReference) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"values": false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "values":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				if next := iter.WhatIsNext(); next != json.StringValue {
 					iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.StringValue, got: %s", next))
@@ -4289,7 +4296,6 @@ func (c *GlobalReference) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object globalReference", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -4298,9 +4304,12 @@ func (c *GlobalReference) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for GlobalReference
 func (c *GlobalReference) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("values")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Values {
 		k.marshalJSON(stream)
@@ -4313,17 +4322,16 @@ func (c *GlobalReference) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for ModelReference
 func (c *ModelReference) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"keys": false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "keys":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Key{}
 				myobj.unmarshalJSON(iter)
@@ -4338,7 +4346,6 @@ func (c *ModelReference) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object modelReference", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -4347,9 +4354,12 @@ func (c *ModelReference) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for ModelReference
 func (c *ModelReference) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("keys")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Keys {
 		k.marshalJSON(stream)
@@ -4359,19 +4369,18 @@ func (c *ModelReference) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("referredSemanticID")
-	stream.WriteMore()
-
 	c.ReferredSemanticId.marshalJSON(stream)
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for Key
 func (c *Key) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"type":  false,
 		"value": false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "type":
@@ -4389,7 +4398,6 @@ func (c *Key) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object key", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -4398,198 +4406,178 @@ func (c *Key) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for Key
 func (c *Key) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("type")
 	c.Type.marshalJSON(stream)
 	stream.WriteObjectField("value")
-	stream.WriteMore()
-
 	stream.WriteString(c.Value)
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for IdentifiableElements
 func (e IdentifiableElements) unmarshalJSON(iter *json.Iterator) {
-	if next := iter.WhatIsNext(); next != json.StringValue {
-		iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.StringValue, got: %s", next))
-	}
 	raw := iter.ReadString()
 	if v, ok := IdentifiableElements_value[raw]; !ok {
-		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", v))
+		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", raw))
 	} else {
 		e = v
 	}
 }
 
+// marshalJSON implements the Marshaler interface for IdentifiableElements
 func (e IdentifiableElements) marshalJSON(stream *json.Stream) {
-	v := IdentifiableElements_name[e]
-	stream.WriteString(v)
+	stream.WriteString(IdentifiableElements_name[e])
 }
 
+// unmarshalJSON implements the Unmarshaler interface for ReferableElements
 func (e ReferableElements) unmarshalJSON(iter *json.Iterator) {
-	if next := iter.WhatIsNext(); next != json.StringValue {
-		iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.StringValue, got: %s", next))
-	}
 	raw := iter.ReadString()
 	if v, ok := ReferableElements_value[raw]; !ok {
-		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", v))
+		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", raw))
 	} else {
 		e = v
 	}
 }
 
+// marshalJSON implements the Marshaler interface for ReferableElements
 func (e ReferableElements) marshalJSON(stream *json.Stream) {
-	v := ReferableElements_name[e]
-	stream.WriteString(v)
+	stream.WriteString(ReferableElements_name[e])
 }
 
+// unmarshalJSON implements the Unmarshaler interface for KeyElements
 func (e KeyElements) unmarshalJSON(iter *json.Iterator) {
-	if next := iter.WhatIsNext(); next != json.StringValue {
-		iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.StringValue, got: %s", next))
-	}
 	raw := iter.ReadString()
 	if v, ok := KeyElements_value[raw]; !ok {
-		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", v))
+		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", raw))
 	} else {
 		e = v
 	}
 }
 
+// marshalJSON implements the Marshaler interface for KeyElements
 func (e KeyElements) marshalJSON(stream *json.Stream) {
-	v := KeyElements_name[e]
-	stream.WriteString(v)
+	stream.WriteString(KeyElements_name[e])
 }
 
+// unmarshalJSON implements the Unmarshaler interface for SubmodelElements
 func (e SubmodelElements) unmarshalJSON(iter *json.Iterator) {
-	if next := iter.WhatIsNext(); next != json.StringValue {
-		iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.StringValue, got: %s", next))
-	}
 	raw := iter.ReadString()
 	if v, ok := SubmodelElements_value[raw]; !ok {
-		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", v))
+		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", raw))
 	} else {
 		e = v
 	}
 }
 
+// marshalJSON implements the Marshaler interface for SubmodelElements
 func (e SubmodelElements) marshalJSON(stream *json.Stream) {
-	v := SubmodelElements_name[e]
-	stream.WriteString(v)
+	stream.WriteString(SubmodelElements_name[e])
 }
 
+// unmarshalJSON implements the Unmarshaler interface for BuildInListTypes
 func (e BuildInListTypes) unmarshalJSON(iter *json.Iterator) {
-	if next := iter.WhatIsNext(); next != json.StringValue {
-		iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.StringValue, got: %s", next))
-	}
 	raw := iter.ReadString()
 	if v, ok := BuildInListTypes_value[raw]; !ok {
-		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", v))
+		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", raw))
 	} else {
 		e = v
 	}
 }
 
+// marshalJSON implements the Marshaler interface for BuildInListTypes
 func (e BuildInListTypes) marshalJSON(stream *json.Stream) {
-	v := BuildInListTypes_name[e]
-	stream.WriteString(v)
+	stream.WriteString(BuildInListTypes_name[e])
 }
 
+// unmarshalJSON implements the Unmarshaler interface for DecimalBuildInTypes
 func (e DecimalBuildInTypes) unmarshalJSON(iter *json.Iterator) {
-	if next := iter.WhatIsNext(); next != json.StringValue {
-		iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.StringValue, got: %s", next))
-	}
 	raw := iter.ReadString()
 	if v, ok := DecimalBuildInTypes_value[raw]; !ok {
-		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", v))
+		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", raw))
 	} else {
 		e = v
 	}
 }
 
+// marshalJSON implements the Marshaler interface for DecimalBuildInTypes
 func (e DecimalBuildInTypes) marshalJSON(stream *json.Stream) {
-	v := DecimalBuildInTypes_name[e]
-	stream.WriteString(v)
+	stream.WriteString(DecimalBuildInTypes_name[e])
 }
 
+// unmarshalJSON implements the Unmarshaler interface for DurationBuildInTypes
 func (e DurationBuildInTypes) unmarshalJSON(iter *json.Iterator) {
-	if next := iter.WhatIsNext(); next != json.StringValue {
-		iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.StringValue, got: %s", next))
-	}
 	raw := iter.ReadString()
 	if v, ok := DurationBuildInTypes_value[raw]; !ok {
-		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", v))
+		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", raw))
 	} else {
 		e = v
 	}
 }
 
+// marshalJSON implements the Marshaler interface for DurationBuildInTypes
 func (e DurationBuildInTypes) marshalJSON(stream *json.Stream) {
-	v := DurationBuildInTypes_name[e]
-	stream.WriteString(v)
+	stream.WriteString(DurationBuildInTypes_name[e])
 }
 
+// unmarshalJSON implements the Unmarshaler interface for PrimitiveTypes
 func (e PrimitiveTypes) unmarshalJSON(iter *json.Iterator) {
-	if next := iter.WhatIsNext(); next != json.StringValue {
-		iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.StringValue, got: %s", next))
-	}
 	raw := iter.ReadString()
 	if v, ok := PrimitiveTypes_value[raw]; !ok {
-		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", v))
+		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", raw))
 	} else {
 		e = v
 	}
 }
 
+// marshalJSON implements the Marshaler interface for PrimitiveTypes
 func (e PrimitiveTypes) marshalJSON(stream *json.Stream) {
-	v := PrimitiveTypes_name[e]
-	stream.WriteString(v)
+	stream.WriteString(PrimitiveTypes_name[e])
 }
 
+// unmarshalJSON implements the Unmarshaler interface for StringBuildInTypes
 func (e StringBuildInTypes) unmarshalJSON(iter *json.Iterator) {
-	if next := iter.WhatIsNext(); next != json.StringValue {
-		iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.StringValue, got: %s", next))
-	}
 	raw := iter.ReadString()
 	if v, ok := StringBuildInTypes_value[raw]; !ok {
-		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", v))
+		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", raw))
 	} else {
 		e = v
 	}
 }
 
+// marshalJSON implements the Marshaler interface for StringBuildInTypes
 func (e StringBuildInTypes) marshalJSON(stream *json.Stream) {
-	v := StringBuildInTypes_name[e]
-	stream.WriteString(v)
+	stream.WriteString(StringBuildInTypes_name[e])
 }
 
+// unmarshalJSON implements the Unmarshaler interface for DataTypeDef
 func (e DataTypeDef) unmarshalJSON(iter *json.Iterator) {
-	if next := iter.WhatIsNext(); next != json.StringValue {
-		iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.StringValue, got: %s", next))
-	}
 	raw := iter.ReadString()
 	if v, ok := DataTypeDef_value[raw]; !ok {
-		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", v))
+		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", raw))
 	} else {
 		e = v
 	}
 }
 
+// marshalJSON implements the Marshaler interface for DataTypeDef
 func (e DataTypeDef) marshalJSON(stream *json.Stream) {
-	v := DataTypeDef_name[e]
-	stream.WriteString(v)
+	stream.WriteString(DataTypeDef_name[e])
 }
 
+// unmarshalJSON implements the Unmarshaler interface for LangStringSet
 func (c *LangStringSet) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		default:
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object langStringSet", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -4598,22 +4586,23 @@ func (c *LangStringSet) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for LangStringSet
 func (c *LangStringSet) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for DataSpecificationContent
 func (c *DataSpecificationContent) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		default:
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object dataSpecificationContent", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -4622,52 +4611,50 @@ func (c *DataSpecificationContent) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for DataSpecificationContent
 func (c *DataSpecificationContent) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for DataTypeIec61360
 func (e DataTypeIec61360) unmarshalJSON(iter *json.Iterator) {
-	if next := iter.WhatIsNext(); next != json.StringValue {
-		iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.StringValue, got: %s", next))
-	}
 	raw := iter.ReadString()
 	if v, ok := DataTypeIec61360_value[raw]; !ok {
-		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", v))
+		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", raw))
 	} else {
 		e = v
 	}
 }
 
+// marshalJSON implements the Marshaler interface for DataTypeIec61360
 func (e DataTypeIec61360) marshalJSON(stream *json.Stream) {
-	v := DataTypeIec61360_name[e]
-	stream.WriteString(v)
+	stream.WriteString(DataTypeIec61360_name[e])
 }
 
+// unmarshalJSON implements the Unmarshaler interface for LevelType
 func (e LevelType) unmarshalJSON(iter *json.Iterator) {
-	if next := iter.WhatIsNext(); next != json.StringValue {
-		iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.StringValue, got: %s", next))
-	}
 	raw := iter.ReadString()
 	if v, ok := LevelType_value[raw]; !ok {
-		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", v))
+		iter.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", raw))
 	} else {
 		e = v
 	}
 }
 
+// marshalJSON implements the Marshaler interface for LevelType
 func (e LevelType) marshalJSON(stream *json.Stream) {
-	v := LevelType_name[e]
-	stream.WriteString(v)
+	stream.WriteString(LevelType_name[e])
 }
 
+// unmarshalJSON implements the Unmarshaler interface for ValueReferencePair
 func (c *ValueReferencePair) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"value":   false,
 		"valueID": false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "value":
@@ -4685,7 +4672,6 @@ func (c *ValueReferencePair) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object valueReferencePair", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -4694,29 +4680,28 @@ func (c *ValueReferencePair) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for ValueReferencePair
 func (c *ValueReferencePair) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("value")
 	stream.WriteString(c.Value)
 	stream.WriteObjectField("valueID")
-	stream.WriteMore()
-
 	c.ValueId.marshalJSON(stream)
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for ValueList
 func (c *ValueList) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"valueReferencePairs": false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "valueReferencePairs":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ValueReferencePair{}
 				myobj.unmarshalJSON(iter)
@@ -4727,7 +4712,6 @@ func (c *ValueList) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object valueList", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -4736,9 +4720,12 @@ func (c *ValueList) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for ValueList
 func (c *ValueList) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("valueReferencePairs")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.ValueReferencePairs {
 		k.marshalJSON(stream)
@@ -4751,9 +4738,10 @@ func (c *ValueList) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for DataSpecificationIec61360
 func (c *DataSpecificationIec61360) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "preferredName":
@@ -4817,7 +4805,6 @@ func (c *DataSpecificationIec61360) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object dataSpecificationIec61360", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -4826,65 +4813,66 @@ func (c *DataSpecificationIec61360) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for DataSpecificationIec61360
 func (c *DataSpecificationIec61360) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("preferredName")
 	c.PreferredName.marshalJSON(stream)
 	stream.WriteObjectField("shortName")
-	stream.WriteMore()
-
 	c.ShortName.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("unit")
-	stream.WriteMore()
-
 	stream.WriteString(c.Unit)
+	stream.WriteMore()
+
 	stream.WriteObjectField("unitID")
-	stream.WriteMore()
-
 	c.UnitId.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("sourceOfDefinition")
-	stream.WriteMore()
-
 	stream.WriteString(c.SourceOfDefinition)
+	stream.WriteMore()
+
 	stream.WriteObjectField("symbol")
-	stream.WriteMore()
-
 	stream.WriteString(c.Symbol)
+	stream.WriteMore()
+
 	stream.WriteObjectField("dataType")
-	stream.WriteMore()
-
 	c.DataType.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("definition")
-	stream.WriteMore()
-
 	c.Definition.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("valueFormat")
-	stream.WriteMore()
-
 	stream.WriteString(c.ValueFormat)
+	stream.WriteMore()
+
 	stream.WriteObjectField("valueList")
-	stream.WriteMore()
-
 	c.ValueList.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("value")
-	stream.WriteMore()
-
 	stream.WriteString(c.Value)
+	stream.WriteMore()
+
 	stream.WriteObjectField("valueID")
-	stream.WriteMore()
-
 	c.ValueId.marshalJSON(stream)
-	stream.WriteObjectField("levelType")
 	stream.WriteMore()
 
+	stream.WriteObjectField("levelType")
 	c.LevelType.marshalJSON(stream)
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for DataSpecificationPhysicalUnit
 func (c *DataSpecificationPhysicalUnit) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "unitName":
@@ -4950,7 +4938,6 @@ func (c *DataSpecificationPhysicalUnit) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object dataSpecificationPhysicalUnit", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -4959,71 +4946,70 @@ func (c *DataSpecificationPhysicalUnit) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for DataSpecificationPhysicalUnit
 func (c *DataSpecificationPhysicalUnit) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("unitName")
 	stream.WriteString(c.UnitName)
 	stream.WriteObjectField("unitSymbol")
-	stream.WriteMore()
-
 	stream.WriteString(c.UnitSymbol)
+	stream.WriteMore()
+
 	stream.WriteObjectField("definition")
-	stream.WriteMore()
-
 	c.Definition.marshalJSON(stream)
+	stream.WriteMore()
+
 	stream.WriteObjectField("siNotation")
-	stream.WriteMore()
-
 	stream.WriteString(c.SiNotation)
+	stream.WriteMore()
+
 	stream.WriteObjectField("dinNotation")
-	stream.WriteMore()
-
 	stream.WriteString(c.DinNotation)
+	stream.WriteMore()
+
 	stream.WriteObjectField("eceName")
-	stream.WriteMore()
-
 	stream.WriteString(c.EceName)
+	stream.WriteMore()
+
 	stream.WriteObjectField("eceCode")
-	stream.WriteMore()
-
 	stream.WriteString(c.EceCode)
+	stream.WriteMore()
+
 	stream.WriteObjectField("nistName")
-	stream.WriteMore()
-
 	stream.WriteString(c.NistName)
+	stream.WriteMore()
+
 	stream.WriteObjectField("sourceOfDefinition")
-	stream.WriteMore()
-
 	stream.WriteString(c.SourceOfDefinition)
+	stream.WriteMore()
+
 	stream.WriteObjectField("conversionFactor")
-	stream.WriteMore()
-
 	stream.WriteString(c.ConversionFactor)
+	stream.WriteMore()
+
 	stream.WriteObjectField("registrationAuthorityID")
-	stream.WriteMore()
-
 	stream.WriteString(c.RegistrationAuthorityId)
-	stream.WriteObjectField("supplier")
 	stream.WriteMore()
 
+	stream.WriteObjectField("supplier")
 	stream.WriteString(c.Supplier)
 
 	stream.WriteObjectEnd()
 }
 
+// unmarshalJSON implements the Unmarshaler interface for Environment
 func (c *Environment) unmarshalJSON(iter *json.Iterator) {
 	isThere := map[string]bool{
 		"assetAdministrationShells": false,
 		"submodels":                 false,
 		"conceptDescriptions":       false,
 	}
-
+	// iterate through all provided object properties and switch on property name
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "assetAdministrationShells":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &AssetAdministrationShell{}
 				myobj.unmarshalJSON(iter)
@@ -5031,9 +5017,7 @@ func (c *Environment) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["assetAdministrationShells"] = true
 		case "submodels":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Submodel{}
 				myobj.unmarshalJSON(iter)
@@ -5041,9 +5025,7 @@ func (c *Environment) unmarshalJSON(iter *json.Iterator) {
 			}
 			isThere["submodels"] = true
 		case "conceptDescriptions":
-			if next := iter.WhatIsNext(); next != json.ArrayValue {
-				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
-			}
+			// loop through every element in the array and unmarshal it
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ConceptDescription{}
 				myobj.unmarshalJSON(iter)
@@ -5054,7 +5036,6 @@ func (c *Environment) unmarshalJSON(iter *json.Iterator) {
 			iter.ReportError("unknown-property", fmt.Sprintf("%s is not a valid property in object environment", f))
 		}
 	}
-
 	for k, v := range isThere {
 		if !v {
 			iter.ReportError("Required property is missing", fmt.Sprintf("%s", k))
@@ -5063,9 +5044,12 @@ func (c *Environment) unmarshalJSON(iter *json.Iterator) {
 	}
 }
 
+// marshalJSON implements Marshaler interface for Environment
 func (c *Environment) marshalJSON(stream *json.Stream) {
 	stream.WriteObjectStart()
+
 	stream.WriteObjectField("assetAdministrationShells")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.AssetAdministrationShells {
 		k.marshalJSON(stream)
@@ -5075,8 +5059,7 @@ func (c *Environment) marshalJSON(stream *json.Stream) {
 	}
 	stream.WriteArrayEnd()
 	stream.WriteObjectField("submodels")
-	stream.WriteMore()
-
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.Submodels {
 		k.marshalJSON(stream)
@@ -5085,9 +5068,10 @@ func (c *Environment) marshalJSON(stream *json.Stream) {
 		}
 	}
 	stream.WriteArrayEnd()
-	stream.WriteObjectField("conceptDescriptions")
 	stream.WriteMore()
 
+	stream.WriteObjectField("conceptDescriptions")
+	// loop through every element in the slice and write it to the stream
 	stream.WriteArrayStart()
 	for i, k := range c.ConceptDescriptions {
 		k.marshalJSON(stream)

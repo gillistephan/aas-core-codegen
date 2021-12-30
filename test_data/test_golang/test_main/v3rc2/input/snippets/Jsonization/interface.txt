@@ -1,3 +1,7 @@
+const (
+	NonNilPointerError = "v must be a pointer and non nil"
+)
+
 // AasCoreMarshaler is the interface implemented by all types of the meta-model
 // that can marshal themselves into a valid JSON.
 type AasCoreMarshaler interface {

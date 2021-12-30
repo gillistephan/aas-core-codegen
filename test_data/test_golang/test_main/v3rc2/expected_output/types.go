@@ -6,7 +6,7 @@ type HasSemantics struct {
 	SemanticId *Reference
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// Single extension of an element.
 type Extension struct {
 	SemanticId *Reference
 	Name       string
@@ -37,34 +37,26 @@ type Identifiable struct {
 	Administration *AdministrativeInformation
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// Enumeration for denoting whether an element is a template or an instance.
 type ModelingKind int32
 
 const (
-	ModelingKind_TEMPLATE ModelingKind = iota
-	ModelingKind_INSTANCE
+	ModelingKind_Template ModelingKind = iota
+	ModelingKind_Instance
 )
 
 var ModelingKind_name = map[ModelingKind]string{
-	0: "TEMPLATE",
-	1: "INSTANCE",
+	0: "Template",
+	1: "Instance",
 }
 
 var ModelingKind_value = map[string]ModelingKind{
-	"TEMPLATE": 0,
-	"INSTANCE": 1,
+	"Template": 0,
+	"Instance": 1,
 }
 
 func (s ModelingKind) String() string {
 	return ModelingKind_name[s]
-}
-
-func GetModelingKindValue(n string) ModelingKind {
-	return ModelingKind_value[n]
-}
-
-func GetModelingKindName(v ModelingKind) string {
-	return ModelingKind_name[v]
 }
 
 type HasKind struct {
@@ -75,7 +67,7 @@ type HasDataSpecification struct {
 	DataSpecifications []Reference
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// Administrative meta-information for an element like version information.
 type AdministrativeInformation struct {
 	DataSpecifications []Reference
 	Version            string
@@ -89,7 +81,8 @@ type Qualifiable struct {
 	Qualifiers []Constraint
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// A qualifier is a type-value-pair that makes additional statements w.r.t.  the value
+// of the element.
 type Qualifier struct {
 	SemanticId *Reference
 	Type       string
@@ -98,12 +91,12 @@ type Qualifier struct {
 	ValueId    *Reference
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// A formula is used to describe constraints by a logical expression.
 type Formula struct {
 	DependsOn []Reference
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// Structure a digital representation of an asset.
 type AssetAdministrationShell struct {
 	DataSpecifications []Reference
 	Extensions         []Extension
@@ -118,7 +111,7 @@ type AssetAdministrationShell struct {
 	Submodels          []Todo
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// Identifying meta data of the asset that is represented by an AAS.
 type AssetInformation struct {
 	AssetKind        *AssetKind
 	GlobalAssetId    *Reference
@@ -126,37 +119,29 @@ type AssetInformation struct {
 	DefaultThumbnail *File
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// Enumeration for denoting whether an element is a type or an instance.
 type AssetKind int32
 
 const (
-	AssetKind_TYPE AssetKind = iota
-	AssetKind_INSTANCE
+	AssetKind_Type AssetKind = iota
+	AssetKind_Instance
 )
 
 var AssetKind_name = map[AssetKind]string{
-	0: "TYPE",
-	1: "INSTANCE",
+	0: "Type",
+	1: "Instance",
 }
 
 var AssetKind_value = map[string]AssetKind{
-	"TYPE":     0,
-	"INSTANCE": 1,
+	"Type":     0,
+	"Instance": 1,
 }
 
 func (s AssetKind) String() string {
 	return AssetKind_name[s]
 }
 
-func GetAssetKindValue(n string) AssetKind {
-	return AssetKind_value[n]
-}
-
-func GetAssetKindName(v AssetKind) string {
-	return AssetKind_name[v]
-}
-
-//TODO: transform_document NOT_IMPLEMENTED
+// An IdentifierKeyValuePair describes a generic identifier as key-value pair.
 type IdentifierKeyValuePair struct {
 	SemanticId        *Reference
 	Key               string
@@ -164,7 +149,7 @@ type IdentifierKeyValuePair struct {
 	ExternalSubjectId *Reference
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// A submodel defines a specific aspect of the asset represented by the AAS.
 type Submodel struct {
 	DataSpecifications []Reference
 	Kind               *ModelingKind
@@ -206,7 +191,7 @@ type RelationshipElement struct {
 	Second             *Reference
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// A submodel element list is an ordered collection of submodel elements.
 type SubmodelElementList struct {
 	DataSpecifications        []Reference
 	Extensions                []Extension
@@ -223,7 +208,8 @@ type SubmodelElementList struct {
 	ValueTypeValues           *DataTypeDef
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// A submodel element struct is is a logical encapsulation of multiple values. It has
+// a number of of submodel elements.
 type SubmodelElementStruct struct {
 	DataSpecifications []Reference
 	Extensions         []Extension
@@ -249,7 +235,7 @@ type DataElement struct {
 	Qualifiers         []Constraint
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// A property is a data element that has a single value.
 type Property struct {
 	DataSpecifications []Reference
 	Extensions         []Extension
@@ -265,7 +251,7 @@ type Property struct {
 	ValueId            *Reference
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// A property is a data element that has a multi-language value.
 type MultiLanguageProperty struct {
 	DataSpecifications []Reference
 	Extensions         []Extension
@@ -280,7 +266,7 @@ type MultiLanguageProperty struct {
 	ValueId            *Reference
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// A range data element is a data element that defines a range with min and max.
 type Range struct {
 	DataSpecifications []Reference
 	Extensions         []Extension
@@ -296,7 +282,9 @@ type Range struct {
 	Max                string
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// A reference element is a data element that defines a logical reference to another
+// element within the same or another AAS or a reference to an external object or
+// entity.
 type ReferenceElement struct {
 	DataSpecifications []Reference
 	Extensions         []Extension
@@ -310,7 +298,8 @@ type ReferenceElement struct {
 	Reference          *Reference
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// A BLOB is a data element that represents a file that is contained with its source
+// code in the value attribute.
 type Blob struct {
 	DataSpecifications []Reference
 	Extensions         []Extension
@@ -325,7 +314,8 @@ type Blob struct {
 	Content            []byte
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// A File is a data element that represents an address to a file.
+// The value is an URI that can represent an absolute or relative path.
 type File struct {
 	DataSpecifications []Reference
 	Extensions         []Extension
@@ -340,7 +330,8 @@ type File struct {
 	Value              string
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// An annotated relationship element is a relationship element that can be annotated
+// with additional data elements.
 type AnnotatedRelationshipElement struct {
 	DataSpecifications []Reference
 	Extensions         []Extension
@@ -356,37 +347,30 @@ type AnnotatedRelationshipElement struct {
 	Annotation         []DataElement
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// Enumeration for denoting whether an entity is a self-managed entity or a co-managed
+// entity.
 type EntityType int32
 
 const (
-	EntityType_CO_MANAGED_ENTITY EntityType = iota
-	EntityType_SELF_MANAGED_ENTITY
+	EntityType_Co_managed_entity EntityType = iota
+	EntityType_Self_managed_entity
 )
 
 var EntityType_name = map[EntityType]string{
-	0: "CO_MANAGED_ENTITY",
-	1: "SELF_MANAGED_ENTITY",
+	0: "Co_managed_entity",
+	1: "Self_managed_entity",
 }
 
 var EntityType_value = map[string]EntityType{
-	"CO_MANAGED_ENTITY":   0,
-	"SELF_MANAGED_ENTITY": 1,
+	"Co_managed_entity":   0,
+	"Self_managed_entity": 1,
 }
 
 func (s EntityType) String() string {
 	return EntityType_name[s]
 }
 
-func GetEntityTypeValue(n string) EntityType {
-	return EntityType_value[n]
-}
-
-func GetEntityTypeName(v EntityType) string {
-	return EntityType_name[v]
-}
-
-//TODO: transform_document NOT_IMPLEMENTED
+// An entity is a submodel element that is used to model entities.
 type Entity struct {
 	DataSpecifications []Reference
 	Extensions         []Extension
@@ -415,7 +399,7 @@ type Event struct {
 	Qualifiers         []Constraint
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// A basic event.
 type BasicEvent struct {
 	DataSpecifications []Reference
 	Extensions         []Extension
@@ -429,7 +413,7 @@ type BasicEvent struct {
 	Observed           Todo
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// An operation is a submodel element with input and output variables.
 type Operation struct {
 	DataSpecifications []Reference
 	Extensions         []Extension
@@ -445,12 +429,14 @@ type Operation struct {
 	InoutputVariables  []OperationVariable
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// An operation variable is a submodel element that is used as input or output variable
+// of an operation.
 type OperationVariable struct {
 	Value *SubmodelElement
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// A capability is the implementation-independent description of the potential of an
+// asset to achieve a certain effect in the physical or virtual world.
 type Capability struct {
 	DataSpecifications []Reference
 	Extensions         []Extension
@@ -463,7 +449,9 @@ type Capability struct {
 	Qualifiers         []Constraint
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// The semantics of a property or other elements that may have a semantic description
+// is defined by a concept description. The description of the concept should follow a
+// standardized schema (realized as data specification template).
 type ConceptDescription struct {
 	DataSpecifications []Reference
 	Extensions         []Extension
@@ -476,7 +464,8 @@ type ConceptDescription struct {
 	IsCaseOf           []Reference
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// A view is a collection of referable elements w.r.t. to a specific viewpoint of one
+// or more stakeholders.
 type View struct {
 	DataSpecifications []Reference
 	Extensions         []Extension
@@ -491,557 +480,496 @@ type View struct {
 type Reference struct {
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// Reference to an external entity.
 type GlobalReference struct {
 	Values []string
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// Reference to a model element of the same or another AAS.
+// A model reference is an ordered list of keys, each key referencing an element.
+// The complete list of keys may for example be concatenated to a path that then gives
+// unique access to an element.
 type ModelReference struct {
 	Keys               []Key
 	ReferredSemanticId *Reference
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// A key is a reference to an element by its id.
 type Key struct {
 	Type  *KeyElements
 	Value string
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// Enumeration of all identifiable elements within an asset administration shell.
 type IdentifiableElements int32
 
 const (
-	IdentifiableElements_ASSET_ADMINISTRATION_SHELL IdentifiableElements = iota
-	IdentifiableElements_CONCEPT_DESCRIPTION
-	IdentifiableElements_SUBMODEL
+	IdentifiableElements_Asset_administration_shell IdentifiableElements = iota
+	IdentifiableElements_Concept_description
+	IdentifiableElements_Submodel
 )
 
 var IdentifiableElements_name = map[IdentifiableElements]string{
-	0: "ASSET_ADMINISTRATION_SHELL",
-	1: "CONCEPT_DESCRIPTION",
-	2: "SUBMODEL",
+	0: "Asset_administration_shell",
+	1: "Concept_description",
+	2: "Submodel",
 }
 
 var IdentifiableElements_value = map[string]IdentifiableElements{
-	"ASSET_ADMINISTRATION_SHELL": 0,
-	"CONCEPT_DESCRIPTION":        1,
-	"SUBMODEL":                   2,
+	"Asset_administration_shell": 0,
+	"Concept_description":        1,
+	"Submodel":                   2,
 }
 
 func (s IdentifiableElements) String() string {
 	return IdentifiableElements_name[s]
 }
 
-func GetIdentifiableElementsValue(n string) IdentifiableElements {
-	return IdentifiableElements_value[n]
-}
-
-func GetIdentifiableElementsName(v IdentifiableElements) string {
-	return IdentifiableElements_name[v]
-}
-
-//TODO: transform_document NOT_IMPLEMENTED
+// Enumeration of all referable elements within an asset administration shell
 type ReferableElements int32
 
 const (
-	ReferableElements_ACCESS_PERMISSION_RULE ReferableElements = iota
-	ReferableElements_ANNOTATED_RELATIONSHIP_ELEMENT
-	ReferableElements_ASSET
-	ReferableElements_ASSET_ADMINISTRATION_SHELL
-	ReferableElements_BASIC_EVENT
-	ReferableElements_BLOB
-	ReferableElements_CAPABILITY
-	ReferableElements_CONCEPT_DESCRIPTION
-	ReferableElements_DATA_ELEMENT
-	ReferableElements_ENTITY
-	ReferableElements_EVENT
-	ReferableElements_FILE
-	ReferableElements_MULTI_LANGUAGE_PROPERTY
-	ReferableElements_OPERATION
-	ReferableElements_PROPERTY
-	ReferableElements_RANGE
-	ReferableElements_REFERENCE_ELEMENT
-	ReferableElements_RELATIONSHIP_ELEMENT
-	ReferableElements_SUBMODEL
-	ReferableElements_SUBMODEL_ELEMENT
-	ReferableElements_SUBMODEL_ELEMENT_LIST
-	ReferableElements_SUBMODEL_ELEMENT_STRUCT
+	ReferableElements_Access_permission_rule ReferableElements = iota
+	ReferableElements_Annotated_relationship_element
+	ReferableElements_Asset
+	ReferableElements_Asset_administration_shell
+	ReferableElements_Basic_event
+	ReferableElements_Blob
+	ReferableElements_Capability
+	ReferableElements_Concept_description
+	ReferableElements_Data_element
+	ReferableElements_Entity
+	ReferableElements_Event
+	ReferableElements_File
+	ReferableElements_Multi_language_property
+	ReferableElements_Operation
+	ReferableElements_Property
+	ReferableElements_Range
+	ReferableElements_Reference_element
+	ReferableElements_Relationship_element
+	ReferableElements_Submodel
+	ReferableElements_Submodel_element
+	ReferableElements_Submodel_element_list
+	ReferableElements_Submodel_element_struct
 )
 
 var ReferableElements_name = map[ReferableElements]string{
-	0:  "ACCESS_PERMISSION_RULE",
-	1:  "ANNOTATED_RELATIONSHIP_ELEMENT",
-	2:  "ASSET",
-	3:  "ASSET_ADMINISTRATION_SHELL",
-	4:  "BASIC_EVENT",
-	5:  "BLOB",
-	6:  "CAPABILITY",
-	7:  "CONCEPT_DESCRIPTION",
-	8:  "DATA_ELEMENT",
-	9:  "ENTITY",
-	10: "EVENT",
-	11: "FILE",
-	12: "MULTI_LANGUAGE_PROPERTY",
-	13: "OPERATION",
-	14: "PROPERTY",
-	15: "RANGE",
-	16: "REFERENCE_ELEMENT",
-	17: "RELATIONSHIP_ELEMENT",
-	18: "SUBMODEL",
-	19: "SUBMODEL_ELEMENT",
-	20: "SUBMODEL_ELEMENT_LIST",
-	21: "SUBMODEL_ELEMENT_STRUCT",
+	0:  "Access_permission_rule",
+	1:  "Annotated_relationship_element",
+	2:  "Asset",
+	3:  "Asset_administration_shell",
+	4:  "Basic_event",
+	5:  "Blob",
+	6:  "Capability",
+	7:  "Concept_description",
+	8:  "Data_element",
+	9:  "Entity",
+	10: "Event",
+	11: "File",
+	12: "Multi_language_property",
+	13: "Operation",
+	14: "Property",
+	15: "Range",
+	16: "Reference_element",
+	17: "Relationship_element",
+	18: "Submodel",
+	19: "Submodel_element",
+	20: "Submodel_element_list",
+	21: "Submodel_element_struct",
 }
 
 var ReferableElements_value = map[string]ReferableElements{
-	"ACCESS_PERMISSION_RULE":         0,
-	"ANNOTATED_RELATIONSHIP_ELEMENT": 1,
-	"ASSET":                          2,
-	"ASSET_ADMINISTRATION_SHELL":     3,
-	"BASIC_EVENT":                    4,
-	"BLOB":                           5,
-	"CAPABILITY":                     6,
-	"CONCEPT_DESCRIPTION":            7,
-	"DATA_ELEMENT":                   8,
-	"ENTITY":                         9,
-	"EVENT":                          10,
-	"FILE":                           11,
-	"MULTI_LANGUAGE_PROPERTY":        12,
-	"OPERATION":                      13,
-	"PROPERTY":                       14,
-	"RANGE":                          15,
-	"REFERENCE_ELEMENT":              16,
-	"RELATIONSHIP_ELEMENT":           17,
-	"SUBMODEL":                       18,
-	"SUBMODEL_ELEMENT":               19,
-	"SUBMODEL_ELEMENT_LIST":          20,
-	"SUBMODEL_ELEMENT_STRUCT":        21,
+	"Access_permission_rule":         0,
+	"Annotated_relationship_element": 1,
+	"Asset":                          2,
+	"Asset_administration_shell":     3,
+	"Basic_event":                    4,
+	"Blob":                           5,
+	"Capability":                     6,
+	"Concept_description":            7,
+	"Data_element":                   8,
+	"Entity":                         9,
+	"Event":                          10,
+	"File":                           11,
+	"Multi_language_property":        12,
+	"Operation":                      13,
+	"Property":                       14,
+	"Range":                          15,
+	"Reference_element":              16,
+	"Relationship_element":           17,
+	"Submodel":                       18,
+	"Submodel_element":               19,
+	"Submodel_element_list":          20,
+	"Submodel_element_struct":        21,
 }
 
 func (s ReferableElements) String() string {
 	return ReferableElements_name[s]
 }
 
-func GetReferableElementsValue(n string) ReferableElements {
-	return ReferableElements_value[n]
-}
-
-func GetReferableElementsName(v ReferableElements) string {
-	return ReferableElements_name[v]
-}
-
-//TODO: transform_document NOT_IMPLEMENTED
+// Enumeration of different key value types within a key.
 type KeyElements int32
 
 const (
-	KeyElements_FRAGMENT_REFERENCE KeyElements = iota
-	KeyElements_ACCESS_PERMISSION_RULE
-	KeyElements_ANNOTATED_RELATIONSHIP_ELEMENT
-	KeyElements_ASSET
-	KeyElements_ASSET_ADMINISTRATION_SHELL
-	KeyElements_BASIC_EVENT
-	KeyElements_BLOB
-	KeyElements_CAPABILITY
-	KeyElements_CONCEPT_DESCRIPTION
-	KeyElements_DATA_ELEMENT
-	KeyElements_ENTITY
-	KeyElements_EVENT
-	KeyElements_FILE
-	KeyElements_MULTI_LANGUAGE_PROPERTY
-	KeyElements_OPERATION
-	KeyElements_PROPERTY
-	KeyElements_RANGE
-	KeyElements_GLOBAL_REFERENCE
-	KeyElements_REFERENCE_ELEMENT
-	KeyElements_RELATIONSHIP_ELEMENT
-	KeyElements_SUBMODEL
-	KeyElements_SUBMODEL_ELEMENT
-	KeyElements_SUBMODEL_ELEMENT_LIST
-	KeyElements_SUBMODEL_ELEMENT_STRUCT
+	KeyElements_Fragment_reference KeyElements = iota
+	KeyElements_Access_permission_rule
+	KeyElements_Annotated_relationship_element
+	KeyElements_Asset
+	KeyElements_Asset_administration_shell
+	KeyElements_Basic_event
+	KeyElements_Blob
+	KeyElements_Capability
+	KeyElements_Concept_description
+	KeyElements_Data_element
+	KeyElements_Entity
+	KeyElements_Event
+	KeyElements_File
+	KeyElements_Multi_language_property
+	KeyElements_Operation
+	KeyElements_Property
+	KeyElements_Range
+	KeyElements_Global_reference
+	KeyElements_Reference_element
+	KeyElements_Relationship_element
+	KeyElements_Submodel
+	KeyElements_Submodel_element
+	KeyElements_Submodel_element_list
+	KeyElements_Submodel_element_struct
 )
 
 var KeyElements_name = map[KeyElements]string{
-	0:  "FRAGMENT_REFERENCE",
-	1:  "ACCESS_PERMISSION_RULE",
-	2:  "ANNOTATED_RELATIONSHIP_ELEMENT",
-	3:  "ASSET",
-	4:  "ASSET_ADMINISTRATION_SHELL",
-	5:  "BASIC_EVENT",
-	6:  "BLOB",
-	7:  "CAPABILITY",
-	8:  "CONCEPT_DESCRIPTION",
-	9:  "DATA_ELEMENT",
-	10: "ENTITY",
-	11: "EVENT",
-	12: "FILE",
-	13: "MULTI_LANGUAGE_PROPERTY",
-	14: "OPERATION",
-	15: "PROPERTY",
-	16: "RANGE",
-	17: "GLOBAL_REFERENCE",
-	18: "REFERENCE_ELEMENT",
-	19: "RELATIONSHIP_ELEMENT",
-	20: "SUBMODEL",
-	21: "SUBMODEL_ELEMENT",
-	22: "SUBMODEL_ELEMENT_LIST",
-	23: "SUBMODEL_ELEMENT_STRUCT",
+	0:  "Fragment_reference",
+	1:  "Access_permission_rule",
+	2:  "Annotated_relationship_element",
+	3:  "Asset",
+	4:  "Asset_administration_shell",
+	5:  "Basic_event",
+	6:  "Blob",
+	7:  "Capability",
+	8:  "Concept_description",
+	9:  "Data_element",
+	10: "Entity",
+	11: "Event",
+	12: "File",
+	13: "Multi_language_property",
+	14: "Operation",
+	15: "Property",
+	16: "Range",
+	17: "Global_reference",
+	18: "Reference_element",
+	19: "Relationship_element",
+	20: "Submodel",
+	21: "Submodel_element",
+	22: "Submodel_element_list",
+	23: "Submodel_element_struct",
 }
 
 var KeyElements_value = map[string]KeyElements{
-	"FRAGMENT_REFERENCE":             0,
-	"ACCESS_PERMISSION_RULE":         1,
-	"ANNOTATED_RELATIONSHIP_ELEMENT": 2,
-	"ASSET":                          3,
-	"ASSET_ADMINISTRATION_SHELL":     4,
-	"BASIC_EVENT":                    5,
-	"BLOB":                           6,
-	"CAPABILITY":                     7,
-	"CONCEPT_DESCRIPTION":            8,
-	"DATA_ELEMENT":                   9,
-	"ENTITY":                         10,
-	"EVENT":                          11,
-	"FILE":                           12,
-	"MULTI_LANGUAGE_PROPERTY":        13,
-	"OPERATION":                      14,
-	"PROPERTY":                       15,
-	"RANGE":                          16,
-	"GLOBAL_REFERENCE":               17,
-	"REFERENCE_ELEMENT":              18,
-	"RELATIONSHIP_ELEMENT":           19,
-	"SUBMODEL":                       20,
-	"SUBMODEL_ELEMENT":               21,
-	"SUBMODEL_ELEMENT_LIST":          22,
-	"SUBMODEL_ELEMENT_STRUCT":        23,
+	"Fragment_reference":             0,
+	"Access_permission_rule":         1,
+	"Annotated_relationship_element": 2,
+	"Asset":                          3,
+	"Asset_administration_shell":     4,
+	"Basic_event":                    5,
+	"Blob":                           6,
+	"Capability":                     7,
+	"Concept_description":            8,
+	"Data_element":                   9,
+	"Entity":                         10,
+	"Event":                          11,
+	"File":                           12,
+	"Multi_language_property":        13,
+	"Operation":                      14,
+	"Property":                       15,
+	"Range":                          16,
+	"Global_reference":               17,
+	"Reference_element":              18,
+	"Relationship_element":           19,
+	"Submodel":                       20,
+	"Submodel_element":               21,
+	"Submodel_element_list":          22,
+	"Submodel_element_struct":        23,
 }
 
 func (s KeyElements) String() string {
 	return KeyElements_name[s]
 }
 
-func GetKeyElementsValue(n string) KeyElements {
-	return KeyElements_value[n]
-}
-
-func GetKeyElementsName(v KeyElements) string {
-	return KeyElements_name[v]
-}
-
-//TODO: transform_document NOT_IMPLEMENTED
+// Enumeration of all referable elements within an asset administration shell.
 type SubmodelElements int32
 
 const (
-	SubmodelElements_ANNOTATED_RELATIONSHIP_ELEMENT SubmodelElements = iota
-	SubmodelElements_ASSET
-	SubmodelElements_ASSET_ADMINISTRATION_SHELL
-	SubmodelElements_BASIC_EVENT
-	SubmodelElements_BLOB
-	SubmodelElements_CAPABILITY
-	SubmodelElements_CONCEPT_DESCRIPTION
-	SubmodelElements_DATA_ELEMENT
-	SubmodelElements_ENTITY
-	SubmodelElements_EVENT
-	SubmodelElements_FILE
-	SubmodelElements_MULTI_LANGUAGE_PROPERTY
-	SubmodelElements_OPERATION
-	SubmodelElements_PROPERTY
-	SubmodelElements_RANGE
-	SubmodelElements_REFERENCE_ELEMENT
-	SubmodelElements_RELATIONSHIP_ELEMENT
-	SubmodelElements_SUBMODEL
-	SubmodelElements_SUBMODEL_ELEMENT
-	SubmodelElements_SUBMODEL_ELEMENT_LIST
-	SubmodelElements_SUBMODEL_ELEMENT_STRUCT
+	SubmodelElements_Annotated_relationship_element SubmodelElements = iota
+	SubmodelElements_Asset
+	SubmodelElements_Asset_administration_shell
+	SubmodelElements_Basic_event
+	SubmodelElements_Blob
+	SubmodelElements_Capability
+	SubmodelElements_Concept_description
+	SubmodelElements_Data_element
+	SubmodelElements_Entity
+	SubmodelElements_Event
+	SubmodelElements_File
+	SubmodelElements_Multi_language_property
+	SubmodelElements_Operation
+	SubmodelElements_Property
+	SubmodelElements_Range
+	SubmodelElements_Reference_element
+	SubmodelElements_Relationship_element
+	SubmodelElements_Submodel
+	SubmodelElements_Submodel_element
+	SubmodelElements_Submodel_element_list
+	SubmodelElements_Submodel_element_struct
 )
 
 var SubmodelElements_name = map[SubmodelElements]string{
-	0:  "ANNOTATED_RELATIONSHIP_ELEMENT",
-	1:  "ASSET",
-	2:  "ASSET_ADMINISTRATION_SHELL",
-	3:  "BASIC_EVENT",
-	4:  "BLOB",
-	5:  "CAPABILITY",
-	6:  "CONCEPT_DESCRIPTION",
-	7:  "DATA_ELEMENT",
-	8:  "ENTITY",
-	9:  "EVENT",
-	10: "FILE",
-	11: "MULTI_LANGUAGE_PROPERTY",
-	12: "OPERATION",
-	13: "PROPERTY",
-	14: "RANGE",
-	15: "REFERENCE_ELEMENT",
-	16: "RELATIONSHIP_ELEMENT",
-	17: "SUBMODEL",
-	18: "SUBMODEL_ELEMENT",
-	19: "SUBMODEL_ELEMENT_LIST",
-	20: "SUBMODEL_ELEMENT_STRUCT",
+	0:  "Annotated_relationship_element",
+	1:  "Asset",
+	2:  "Asset_administration_shell",
+	3:  "Basic_event",
+	4:  "Blob",
+	5:  "Capability",
+	6:  "Concept_description",
+	7:  "Data_element",
+	8:  "Entity",
+	9:  "Event",
+	10: "File",
+	11: "Multi_language_property",
+	12: "Operation",
+	13: "Property",
+	14: "Range",
+	15: "Reference_element",
+	16: "Relationship_element",
+	17: "Submodel",
+	18: "Submodel_element",
+	19: "Submodel_element_list",
+	20: "Submodel_element_struct",
 }
 
 var SubmodelElements_value = map[string]SubmodelElements{
-	"ANNOTATED_RELATIONSHIP_ELEMENT": 0,
-	"ASSET":                          1,
-	"ASSET_ADMINISTRATION_SHELL":     2,
-	"BASIC_EVENT":                    3,
-	"BLOB":                           4,
-	"CAPABILITY":                     5,
-	"CONCEPT_DESCRIPTION":            6,
-	"DATA_ELEMENT":                   7,
-	"ENTITY":                         8,
-	"EVENT":                          9,
-	"FILE":                           10,
-	"MULTI_LANGUAGE_PROPERTY":        11,
-	"OPERATION":                      12,
-	"PROPERTY":                       13,
-	"RANGE":                          14,
-	"REFERENCE_ELEMENT":              15,
-	"RELATIONSHIP_ELEMENT":           16,
-	"SUBMODEL":                       17,
-	"SUBMODEL_ELEMENT":               18,
-	"SUBMODEL_ELEMENT_LIST":          19,
-	"SUBMODEL_ELEMENT_STRUCT":        20,
+	"Annotated_relationship_element": 0,
+	"Asset":                          1,
+	"Asset_administration_shell":     2,
+	"Basic_event":                    3,
+	"Blob":                           4,
+	"Capability":                     5,
+	"Concept_description":            6,
+	"Data_element":                   7,
+	"Entity":                         8,
+	"Event":                          9,
+	"File":                           10,
+	"Multi_language_property":        11,
+	"Operation":                      12,
+	"Property":                       13,
+	"Range":                          14,
+	"Reference_element":              15,
+	"Relationship_element":           16,
+	"Submodel":                       17,
+	"Submodel_element":               18,
+	"Submodel_element_list":          19,
+	"Submodel_element_struct":        20,
 }
 
 func (s SubmodelElements) String() string {
 	return SubmodelElements_name[s]
 }
 
-func GetSubmodelElementsValue(n string) SubmodelElements {
-	return SubmodelElements_value[n]
-}
-
-func GetSubmodelElementsName(v SubmodelElements) string {
-	return SubmodelElements_name[v]
-}
-
 type BuildInListTypes int32
 
 const (
-	BuildInListTypes_ENTITIES BuildInListTypes = iota
-	BuildInListTypes_ID_REFS
-	BuildInListTypes_N_M_TOKENS
+	BuildInListTypes_Entities BuildInListTypes = iota
+	BuildInListTypes_ID_refs
+	BuildInListTypes_N_M_tokens
 )
 
 var BuildInListTypes_name = map[BuildInListTypes]string{
-	0: "ENTITIES",
-	1: "ID_REFS",
-	2: "N_M_TOKENS",
+	0: "Entities",
+	1: "ID_refs",
+	2: "N_M_tokens",
 }
 
 var BuildInListTypes_value = map[string]BuildInListTypes{
-	"ENTITIES":   0,
-	"ID_REFS":    1,
-	"N_M_TOKENS": 2,
+	"Entities":   0,
+	"ID_refs":    1,
+	"N_M_tokens": 2,
 }
 
 func (s BuildInListTypes) String() string {
 	return BuildInListTypes_name[s]
 }
 
-func GetBuildInListTypesValue(n string) BuildInListTypes {
-	return BuildInListTypes_value[n]
-}
-
-func GetBuildInListTypesName(v BuildInListTypes) string {
-	return BuildInListTypes_name[v]
-}
-
 type DecimalBuildInTypes int32
 
 const (
-	DecimalBuildInTypes_INTEGER DecimalBuildInTypes = iota
-	DecimalBuildInTypes_LONG
-	DecimalBuildInTypes_INT
-	DecimalBuildInTypes_SHORT
-	DecimalBuildInTypes_BYTE
-	DecimalBuildInTypes_NON_NEGATIVE_INTEGER
-	DecimalBuildInTypes_POSITIVE_INTEGER
-	DecimalBuildInTypes_UNSIGNED_INTEGER
-	DecimalBuildInTypes_UNSIGNED_LONG
-	DecimalBuildInTypes_UNSIGNED_INT
-	DecimalBuildInTypes_UNSIGNED_SHORT
-	DecimalBuildInTypes_UNSIGNED_BYTE
-	DecimalBuildInTypes_NON_POSITIVE_INTEGER
-	DecimalBuildInTypes_NEGATIVE_INTEGER
+	DecimalBuildInTypes_Integer DecimalBuildInTypes = iota
+	DecimalBuildInTypes_Long
+	DecimalBuildInTypes_Int
+	DecimalBuildInTypes_Short
+	DecimalBuildInTypes_Byte
+	DecimalBuildInTypes_Non_negative_integer
+	DecimalBuildInTypes_Positive_integer
+	DecimalBuildInTypes_Unsigned_integer
+	DecimalBuildInTypes_Unsigned_long
+	DecimalBuildInTypes_Unsigned_int
+	DecimalBuildInTypes_Unsigned_short
+	DecimalBuildInTypes_Unsigned_byte
+	DecimalBuildInTypes_Non_positive_integer
+	DecimalBuildInTypes_Negative_integer
 )
 
 var DecimalBuildInTypes_name = map[DecimalBuildInTypes]string{
-	0:  "INTEGER",
-	1:  "LONG",
-	2:  "INT",
-	3:  "SHORT",
-	4:  "BYTE",
-	5:  "NON_NEGATIVE_INTEGER",
-	6:  "POSITIVE_INTEGER",
-	7:  "UNSIGNED_INTEGER",
-	8:  "UNSIGNED_LONG",
-	9:  "UNSIGNED_INT",
-	10: "UNSIGNED_SHORT",
-	11: "UNSIGNED_BYTE",
-	12: "NON_POSITIVE_INTEGER",
-	13: "NEGATIVE_INTEGER",
+	0:  "Integer",
+	1:  "Long",
+	2:  "Int",
+	3:  "Short",
+	4:  "Byte",
+	5:  "Non_negative_integer",
+	6:  "Positive_integer",
+	7:  "Unsigned_integer",
+	8:  "Unsigned_long",
+	9:  "Unsigned_int",
+	10: "Unsigned_short",
+	11: "Unsigned_byte",
+	12: "Non_positive_integer",
+	13: "Negative_integer",
 }
 
 var DecimalBuildInTypes_value = map[string]DecimalBuildInTypes{
-	"INTEGER":              0,
-	"LONG":                 1,
-	"INT":                  2,
-	"SHORT":                3,
-	"BYTE":                 4,
-	"NON_NEGATIVE_INTEGER": 5,
-	"POSITIVE_INTEGER":     6,
-	"UNSIGNED_INTEGER":     7,
-	"UNSIGNED_LONG":        8,
-	"UNSIGNED_INT":         9,
-	"UNSIGNED_SHORT":       10,
-	"UNSIGNED_BYTE":        11,
-	"NON_POSITIVE_INTEGER": 12,
-	"NEGATIVE_INTEGER":     13,
+	"Integer":              0,
+	"Long":                 1,
+	"Int":                  2,
+	"Short":                3,
+	"Byte":                 4,
+	"Non_negative_integer": 5,
+	"Positive_integer":     6,
+	"Unsigned_integer":     7,
+	"Unsigned_long":        8,
+	"Unsigned_int":         9,
+	"Unsigned_short":       10,
+	"Unsigned_byte":        11,
+	"Non_positive_integer": 12,
+	"Negative_integer":     13,
 }
 
 func (s DecimalBuildInTypes) String() string {
 	return DecimalBuildInTypes_name[s]
 }
 
-func GetDecimalBuildInTypesValue(n string) DecimalBuildInTypes {
-	return DecimalBuildInTypes_value[n]
-}
-
-func GetDecimalBuildInTypesName(v DecimalBuildInTypes) string {
-	return DecimalBuildInTypes_name[v]
-}
-
 type DurationBuildInTypes int32
 
 const (
-	DurationBuildInTypes_DAY_TIME_DURATION DurationBuildInTypes = iota
-	DurationBuildInTypes_YEAR_MONTH_DURATION
+	DurationBuildInTypes_Day_time_duration DurationBuildInTypes = iota
+	DurationBuildInTypes_Year_month_duration
 )
 
 var DurationBuildInTypes_name = map[DurationBuildInTypes]string{
-	0: "DAY_TIME_DURATION",
-	1: "YEAR_MONTH_DURATION",
+	0: "Day_time_duration",
+	1: "Year_month_duration",
 }
 
 var DurationBuildInTypes_value = map[string]DurationBuildInTypes{
-	"DAY_TIME_DURATION":   0,
-	"YEAR_MONTH_DURATION": 1,
+	"Day_time_duration":   0,
+	"Year_month_duration": 1,
 }
 
 func (s DurationBuildInTypes) String() string {
 	return DurationBuildInTypes_name[s]
 }
 
-func GetDurationBuildInTypesValue(n string) DurationBuildInTypes {
-	return DurationBuildInTypes_value[n]
-}
-
-func GetDurationBuildInTypesName(v DurationBuildInTypes) string {
-	return DurationBuildInTypes_name[v]
-}
-
 type PrimitiveTypes int32
 
 const (
-	PrimitiveTypes_ANY_URI PrimitiveTypes = iota
-	PrimitiveTypes_BASE_64_BINARY
-	PrimitiveTypes_BOOLEAN
-	PrimitiveTypes_DATE
-	PrimitiveTypes_DATE_TIME
-	PrimitiveTypes_DECIMAL
-	PrimitiveTypes_DOUBLE
-	PrimitiveTypes_DURATION
-	PrimitiveTypes_FLOAT
-	PrimitiveTypes_G_DAY
-	PrimitiveTypes_G_MONTH
-	PrimitiveTypes_G_MONTH_DAY
-	PrimitiveTypes_HEY_BINARY
-	PrimitiveTypes_NOTATION
-	PrimitiveTypes_Q_NAME
-	PrimitiveTypes_STRING
-	PrimitiveTypes_TIME
+	PrimitiveTypes_Any_URI PrimitiveTypes = iota
+	PrimitiveTypes_Base_64_binary
+	PrimitiveTypes_Boolean
+	PrimitiveTypes_Date
+	PrimitiveTypes_Date_time
+	PrimitiveTypes_Decimal
+	PrimitiveTypes_Double
+	PrimitiveTypes_Duration
+	PrimitiveTypes_Float
+	PrimitiveTypes_G_day
+	PrimitiveTypes_G_month
+	PrimitiveTypes_G_month_day
+	PrimitiveTypes_Hey_binary
+	PrimitiveTypes_Notation
+	PrimitiveTypes_Q_name
+	PrimitiveTypes_String
+	PrimitiveTypes_Time
 )
 
 var PrimitiveTypes_name = map[PrimitiveTypes]string{
-	0:  "ANY_URI",
-	1:  "BASE_64_BINARY",
-	2:  "BOOLEAN",
-	3:  "DATE",
-	4:  "DATE_TIME",
-	5:  "DECIMAL",
-	6:  "DOUBLE",
-	7:  "DURATION",
-	8:  "FLOAT",
-	9:  "G_DAY",
-	10: "G_MONTH",
-	11: "G_MONTH_DAY",
-	12: "HEY_BINARY",
-	13: "NOTATION",
-	14: "Q_NAME",
-	15: "STRING",
-	16: "TIME",
+	0:  "Any_URI",
+	1:  "Base_64_binary",
+	2:  "Boolean",
+	3:  "Date",
+	4:  "Date_time",
+	5:  "Decimal",
+	6:  "Double",
+	7:  "Duration",
+	8:  "Float",
+	9:  "G_day",
+	10: "G_month",
+	11: "G_month_day",
+	12: "Hey_binary",
+	13: "Notation",
+	14: "Q_name",
+	15: "String",
+	16: "Time",
 }
 
 var PrimitiveTypes_value = map[string]PrimitiveTypes{
-	"ANY_URI":        0,
-	"BASE_64_BINARY": 1,
-	"BOOLEAN":        2,
-	"DATE":           3,
-	"DATE_TIME":      4,
-	"DECIMAL":        5,
-	"DOUBLE":         6,
-	"DURATION":       7,
-	"FLOAT":          8,
-	"G_DAY":          9,
-	"G_MONTH":        10,
-	"G_MONTH_DAY":    11,
-	"HEY_BINARY":     12,
-	"NOTATION":       13,
-	"Q_NAME":         14,
-	"STRING":         15,
-	"TIME":           16,
+	"Any_URI":        0,
+	"Base_64_binary": 1,
+	"Boolean":        2,
+	"Date":           3,
+	"Date_time":      4,
+	"Decimal":        5,
+	"Double":         6,
+	"Duration":       7,
+	"Float":          8,
+	"G_day":          9,
+	"G_month":        10,
+	"G_month_day":    11,
+	"Hey_binary":     12,
+	"Notation":       13,
+	"Q_name":         14,
+	"String":         15,
+	"Time":           16,
 }
 
 func (s PrimitiveTypes) String() string {
 	return PrimitiveTypes_name[s]
 }
 
-func GetPrimitiveTypesValue(n string) PrimitiveTypes {
-	return PrimitiveTypes_value[n]
-}
-
-func GetPrimitiveTypesName(v PrimitiveTypes) string {
-	return PrimitiveTypes_name[v]
-}
-
 type StringBuildInTypes int32
 
 const (
-	StringBuildInTypes_NORMALIZED_STRING StringBuildInTypes = iota
-	StringBuildInTypes_TOKEN
-	StringBuildInTypes_LANGUAGE
-	StringBuildInTypes_N_C_NAME
-	StringBuildInTypes_ENTITY
+	StringBuildInTypes_Normalized_string StringBuildInTypes = iota
+	StringBuildInTypes_Token
+	StringBuildInTypes_Language
+	StringBuildInTypes_N_C_name
+	StringBuildInTypes_Entity
 	StringBuildInTypes_ID
 	StringBuildInTypes_IDREF
 )
 
 var StringBuildInTypes_name = map[StringBuildInTypes]string{
-	0: "NORMALIZED_STRING",
-	1: "TOKEN",
-	2: "LANGUAGE",
-	3: "N_C_NAME",
-	4: "ENTITY",
+	0: "Normalized_string",
+	1: "Token",
+	2: "Language",
+	3: "N_C_name",
+	4: "Entity",
 	5: "ID",
 	6: "IDREF",
 }
 
 var StringBuildInTypes_value = map[string]StringBuildInTypes{
-	"NORMALIZED_STRING": 0,
-	"TOKEN":             1,
-	"LANGUAGE":          2,
-	"N_C_NAME":          3,
-	"ENTITY":            4,
+	"Normalized_string": 0,
+	"Token":             1,
+	"Language":          2,
+	"N_C_name":          3,
+	"Entity":            4,
 	"ID":                5,
 	"IDREF":             6,
 }
@@ -1050,165 +978,149 @@ func (s StringBuildInTypes) String() string {
 	return StringBuildInTypes_name[s]
 }
 
-func GetStringBuildInTypesValue(n string) StringBuildInTypes {
-	return StringBuildInTypes_value[n]
-}
-
-func GetStringBuildInTypesName(v StringBuildInTypes) string {
-	return StringBuildInTypes_name[v]
-}
-
-//TODO: transform_document NOT_IMPLEMENTED
+// Enumeration listing all xsd anySimpleTypes
 type DataTypeDef int32
 
 const (
-	DataTypeDef_ENTITIES DataTypeDef = iota
-	DataTypeDef_ID_REFS
-	DataTypeDef_N_M_TOKENS
-	DataTypeDef_INTEGER
-	DataTypeDef_LONG
-	DataTypeDef_INT
-	DataTypeDef_SHORT
-	DataTypeDef_BYTE
-	DataTypeDef_NON_NEGATIVE_INTEGER
-	DataTypeDef_POSITIVE_INTEGER
-	DataTypeDef_UNSIGNED_INTEGER
-	DataTypeDef_UNSIGNED_LONG
-	DataTypeDef_UNSIGNED_INT
-	DataTypeDef_UNSIGNED_SHORT
-	DataTypeDef_UNSIGNED_BYTE
-	DataTypeDef_NON_POSITIVE_INTEGER
-	DataTypeDef_NEGATIVE_INTEGER
-	DataTypeDef_DAY_TIME_DURATION
-	DataTypeDef_YEAR_MONTH_DURATION
-	DataTypeDef_ANY_URI
-	DataTypeDef_BASE_64_BINARY
-	DataTypeDef_BOOLEAN
-	DataTypeDef_DATE
-	DataTypeDef_DATE_TIME
-	DataTypeDef_DECIMAL
-	DataTypeDef_DOUBLE
-	DataTypeDef_DURATION
-	DataTypeDef_FLOAT
-	DataTypeDef_G_DAY
-	DataTypeDef_G_MONTH
-	DataTypeDef_G_MONTH_DAY
-	DataTypeDef_HEY_BINARY
-	DataTypeDef_NOTATION
-	DataTypeDef_Q_NAME
-	DataTypeDef_STRING
-	DataTypeDef_TIME
-	DataTypeDef_NORMALIZED_STRING
-	DataTypeDef_TOKEN
-	DataTypeDef_LANGUAGE
-	DataTypeDef_N_C_NAME
-	DataTypeDef_ENTITY
+	DataTypeDef_Entities DataTypeDef = iota
+	DataTypeDef_ID_refs
+	DataTypeDef_N_M_tokens
+	DataTypeDef_Integer
+	DataTypeDef_Long
+	DataTypeDef_Int
+	DataTypeDef_Short
+	DataTypeDef_Byte
+	DataTypeDef_Non_negative_integer
+	DataTypeDef_Positive_integer
+	DataTypeDef_Unsigned_integer
+	DataTypeDef_Unsigned_long
+	DataTypeDef_Unsigned_int
+	DataTypeDef_Unsigned_short
+	DataTypeDef_Unsigned_byte
+	DataTypeDef_Non_positive_integer
+	DataTypeDef_Negative_integer
+	DataTypeDef_Day_time_duration
+	DataTypeDef_Year_month_duration
+	DataTypeDef_Any_URI
+	DataTypeDef_Base_64_binary
+	DataTypeDef_Boolean
+	DataTypeDef_Date
+	DataTypeDef_Date_time
+	DataTypeDef_Decimal
+	DataTypeDef_Double
+	DataTypeDef_Duration
+	DataTypeDef_Float
+	DataTypeDef_G_day
+	DataTypeDef_G_month
+	DataTypeDef_G_month_day
+	DataTypeDef_Hey_binary
+	DataTypeDef_Notation
+	DataTypeDef_Q_name
+	DataTypeDef_String
+	DataTypeDef_Time
+	DataTypeDef_Normalized_string
+	DataTypeDef_Token
+	DataTypeDef_Language
+	DataTypeDef_N_C_name
+	DataTypeDef_Entity
 	DataTypeDef_ID
 	DataTypeDef_IDREF
 )
 
 var DataTypeDef_name = map[DataTypeDef]string{
-	0:  "ENTITIES",
-	1:  "ID_REFS",
-	2:  "N_M_TOKENS",
-	3:  "INTEGER",
-	4:  "LONG",
-	5:  "INT",
-	6:  "SHORT",
-	7:  "BYTE",
-	8:  "NON_NEGATIVE_INTEGER",
-	9:  "POSITIVE_INTEGER",
-	10: "UNSIGNED_INTEGER",
-	11: "UNSIGNED_LONG",
-	12: "UNSIGNED_INT",
-	13: "UNSIGNED_SHORT",
-	14: "UNSIGNED_BYTE",
-	15: "NON_POSITIVE_INTEGER",
-	16: "NEGATIVE_INTEGER",
-	17: "DAY_TIME_DURATION",
-	18: "YEAR_MONTH_DURATION",
-	19: "ANY_URI",
-	20: "BASE_64_BINARY",
-	21: "BOOLEAN",
-	22: "DATE",
-	23: "DATE_TIME",
-	24: "DECIMAL",
-	25: "DOUBLE",
-	26: "DURATION",
-	27: "FLOAT",
-	28: "G_DAY",
-	29: "G_MONTH",
-	30: "G_MONTH_DAY",
-	31: "HEY_BINARY",
-	32: "NOTATION",
-	33: "Q_NAME",
-	34: "STRING",
-	35: "TIME",
-	36: "NORMALIZED_STRING",
-	37: "TOKEN",
-	38: "LANGUAGE",
-	39: "N_C_NAME",
-	40: "ENTITY",
+	0:  "Entities",
+	1:  "ID_refs",
+	2:  "N_M_tokens",
+	3:  "Integer",
+	4:  "Long",
+	5:  "Int",
+	6:  "Short",
+	7:  "Byte",
+	8:  "Non_negative_integer",
+	9:  "Positive_integer",
+	10: "Unsigned_integer",
+	11: "Unsigned_long",
+	12: "Unsigned_int",
+	13: "Unsigned_short",
+	14: "Unsigned_byte",
+	15: "Non_positive_integer",
+	16: "Negative_integer",
+	17: "Day_time_duration",
+	18: "Year_month_duration",
+	19: "Any_URI",
+	20: "Base_64_binary",
+	21: "Boolean",
+	22: "Date",
+	23: "Date_time",
+	24: "Decimal",
+	25: "Double",
+	26: "Duration",
+	27: "Float",
+	28: "G_day",
+	29: "G_month",
+	30: "G_month_day",
+	31: "Hey_binary",
+	32: "Notation",
+	33: "Q_name",
+	34: "String",
+	35: "Time",
+	36: "Normalized_string",
+	37: "Token",
+	38: "Language",
+	39: "N_C_name",
+	40: "Entity",
 	41: "ID",
 	42: "IDREF",
 }
 
 var DataTypeDef_value = map[string]DataTypeDef{
-	"ENTITIES":             0,
-	"ID_REFS":              1,
-	"N_M_TOKENS":           2,
-	"INTEGER":              3,
-	"LONG":                 4,
-	"INT":                  5,
-	"SHORT":                6,
-	"BYTE":                 7,
-	"NON_NEGATIVE_INTEGER": 8,
-	"POSITIVE_INTEGER":     9,
-	"UNSIGNED_INTEGER":     10,
-	"UNSIGNED_LONG":        11,
-	"UNSIGNED_INT":         12,
-	"UNSIGNED_SHORT":       13,
-	"UNSIGNED_BYTE":        14,
-	"NON_POSITIVE_INTEGER": 15,
-	"NEGATIVE_INTEGER":     16,
-	"DAY_TIME_DURATION":    17,
-	"YEAR_MONTH_DURATION":  18,
-	"ANY_URI":              19,
-	"BASE_64_BINARY":       20,
-	"BOOLEAN":              21,
-	"DATE":                 22,
-	"DATE_TIME":            23,
-	"DECIMAL":              24,
-	"DOUBLE":               25,
-	"DURATION":             26,
-	"FLOAT":                27,
-	"G_DAY":                28,
-	"G_MONTH":              29,
-	"G_MONTH_DAY":          30,
-	"HEY_BINARY":           31,
-	"NOTATION":             32,
-	"Q_NAME":               33,
-	"STRING":               34,
-	"TIME":                 35,
-	"NORMALIZED_STRING":    36,
-	"TOKEN":                37,
-	"LANGUAGE":             38,
-	"N_C_NAME":             39,
-	"ENTITY":               40,
+	"Entities":             0,
+	"ID_refs":              1,
+	"N_M_tokens":           2,
+	"Integer":              3,
+	"Long":                 4,
+	"Int":                  5,
+	"Short":                6,
+	"Byte":                 7,
+	"Non_negative_integer": 8,
+	"Positive_integer":     9,
+	"Unsigned_integer":     10,
+	"Unsigned_long":        11,
+	"Unsigned_int":         12,
+	"Unsigned_short":       13,
+	"Unsigned_byte":        14,
+	"Non_positive_integer": 15,
+	"Negative_integer":     16,
+	"Day_time_duration":    17,
+	"Year_month_duration":  18,
+	"Any_URI":              19,
+	"Base_64_binary":       20,
+	"Boolean":              21,
+	"Date":                 22,
+	"Date_time":            23,
+	"Decimal":              24,
+	"Double":               25,
+	"Duration":             26,
+	"Float":                27,
+	"G_day":                28,
+	"G_month":              29,
+	"G_month_day":          30,
+	"Hey_binary":           31,
+	"Notation":             32,
+	"Q_name":               33,
+	"String":               34,
+	"Time":                 35,
+	"Normalized_string":    36,
+	"Token":                37,
+	"Language":             38,
+	"N_C_name":             39,
+	"Entity":               40,
 	"ID":                   41,
 	"IDREF":                42,
 }
 
 func (s DataTypeDef) String() string {
 	return DataTypeDef_name[s]
-}
-
-func GetDataTypeDefValue(n string) DataTypeDef {
-	return DataTypeDef_value[n]
-}
-
-func GetDataTypeDefName(v DataTypeDef) string {
-	return DataTypeDef_name[v]
 }
 
 type LangStringSet struct{}
@@ -1219,130 +1131,116 @@ type DataSpecificationContent struct {
 type DataTypeIec61360 int32
 
 const (
-	DataTypeIec61360_DATE DataTypeIec61360 = iota
-	DataTypeIec61360_STRING
-	DataTypeIec61360_STRING_TRANSLATABLE
-	DataTypeIec61360_INTEGER_MEASURE
-	DataTypeIec61360_INTEGER_COUNT
-	DataTypeIec61360_INTEGER_CURRENCY
-	DataTypeIec61360_REAL_MEASURE
-	DataTypeIec61360_REAL_COUNT
-	DataTypeIec61360_REAL_CURRENCY
-	DataTypeIec61360_BOOLEAN
+	DataTypeIec61360_Date DataTypeIec61360 = iota
+	DataTypeIec61360_String
+	DataTypeIec61360_String_translatable
+	DataTypeIec61360_Integer_Measure
+	DataTypeIec61360_Integer_count
+	DataTypeIec61360_Integer_currency
+	DataTypeIec61360_Real_measure
+	DataTypeIec61360_Real_count
+	DataTypeIec61360_Real_currency
+	DataTypeIec61360_Boolean
 	DataTypeIec61360_IRI
 	DataTypeIec61360_IRDI
-	DataTypeIec61360_RATIONAL
-	DataTypeIec61360_RATIONAL_MEASURE
-	DataTypeIec61360_TIME
-	DataTypeIec61360_TIMESTAMP
-	DataTypeIec61360_FILE
+	DataTypeIec61360_Rational
+	DataTypeIec61360_Rational_measure
+	DataTypeIec61360_Time
+	DataTypeIec61360_Timestamp
+	DataTypeIec61360_File
 	DataTypeIec61360_HTML
-	DataTypeIec61360_BLOB
+	DataTypeIec61360_Blob
 )
 
 var DataTypeIec61360_name = map[DataTypeIec61360]string{
-	0:  "DATE",
-	1:  "STRING",
-	2:  "STRING_TRANSLATABLE",
-	3:  "INTEGER_MEASURE",
-	4:  "INTEGER_COUNT",
-	5:  "INTEGER_CURRENCY",
-	6:  "REAL_MEASURE",
-	7:  "REAL_COUNT",
-	8:  "REAL_CURRENCY",
-	9:  "BOOLEAN",
+	0:  "Date",
+	1:  "String",
+	2:  "String_translatable",
+	3:  "Integer_Measure",
+	4:  "Integer_count",
+	5:  "Integer_currency",
+	6:  "Real_measure",
+	7:  "Real_count",
+	8:  "Real_currency",
+	9:  "Boolean",
 	10: "IRI",
 	11: "IRDI",
-	12: "RATIONAL",
-	13: "RATIONAL_MEASURE",
-	14: "TIME",
-	15: "TIMESTAMP",
-	16: "FILE",
+	12: "Rational",
+	13: "Rational_measure",
+	14: "Time",
+	15: "Timestamp",
+	16: "File",
 	17: "HTML",
-	18: "BLOB",
+	18: "Blob",
 }
 
 var DataTypeIec61360_value = map[string]DataTypeIec61360{
-	"DATE":                0,
-	"STRING":              1,
-	"STRING_TRANSLATABLE": 2,
-	"INTEGER_MEASURE":     3,
-	"INTEGER_COUNT":       4,
-	"INTEGER_CURRENCY":    5,
-	"REAL_MEASURE":        6,
-	"REAL_COUNT":          7,
-	"REAL_CURRENCY":       8,
-	"BOOLEAN":             9,
+	"Date":                0,
+	"String":              1,
+	"String_translatable": 2,
+	"Integer_Measure":     3,
+	"Integer_count":       4,
+	"Integer_currency":    5,
+	"Real_measure":        6,
+	"Real_count":          7,
+	"Real_currency":       8,
+	"Boolean":             9,
 	"IRI":                 10,
 	"IRDI":                11,
-	"RATIONAL":            12,
-	"RATIONAL_MEASURE":    13,
-	"TIME":                14,
-	"TIMESTAMP":           15,
-	"FILE":                16,
+	"Rational":            12,
+	"Rational_measure":    13,
+	"Time":                14,
+	"Timestamp":           15,
+	"File":                16,
 	"HTML":                17,
-	"BLOB":                18,
+	"Blob":                18,
 }
 
 func (s DataTypeIec61360) String() string {
 	return DataTypeIec61360_name[s]
 }
 
-func GetDataTypeIec61360Value(n string) DataTypeIec61360 {
-	return DataTypeIec61360_value[n]
-}
-
-func GetDataTypeIec61360Name(v DataTypeIec61360) string {
-	return DataTypeIec61360_name[v]
-}
-
 type LevelType int32
 
 const (
-	LevelType_MIN LevelType = iota
-	LevelType_MAX
-	LevelType_NOM
-	LevelType_TYPE
+	LevelType_Min LevelType = iota
+	LevelType_Max
+	LevelType_Nom
+	LevelType_Type
 )
 
 var LevelType_name = map[LevelType]string{
-	0: "MIN",
-	1: "MAX",
-	2: "NOM",
-	3: "TYPE",
+	0: "Min",
+	1: "Max",
+	2: "Nom",
+	3: "Type",
 }
 
 var LevelType_value = map[string]LevelType{
-	"MIN":  0,
-	"MAX":  1,
-	"NOM":  2,
-	"TYPE": 3,
+	"Min":  0,
+	"Max":  1,
+	"Nom":  2,
+	"Type": 3,
 }
 
 func (s LevelType) String() string {
 	return LevelType_name[s]
 }
 
-func GetLevelTypeValue(n string) LevelType {
-	return LevelType_value[n]
-}
-
-func GetLevelTypeName(v LevelType) string {
-	return LevelType_name[v]
-}
-
-//TODO: transform_document NOT_IMPLEMENTED
+// A value reference pair within a value list. Each value has a global unique id
+// defining its semantic.
 type ValueReferencePair struct {
 	Value   string
 	ValueId *Reference
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// A set of value reference pairs.
 type ValueList struct {
 	ValueReferencePairs []ValueReferencePair
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// Content of data specification template for concept descriptions conformant to
+// IEC 61360.
 type DataSpecificationIec61360 struct {
 	PreferredName      *LangStringSet
 	ShortName          *LangStringSet
@@ -1359,7 +1257,7 @@ type DataSpecificationIec61360 struct {
 	LevelType          *LevelType
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// TODO
 type DataSpecificationPhysicalUnit struct {
 	UnitName                string
 	UnitSymbol              string
@@ -1375,7 +1273,7 @@ type DataSpecificationPhysicalUnit struct {
 	Supplier                string
 }
 
-//TODO: transform_document NOT_IMPLEMENTED
+// Model the environment as the entry point for referencing and serialization.
 type Environment struct {
 	AssetAdministrationShells []AssetAdministrationShell
 	Submodels                 []Submodel

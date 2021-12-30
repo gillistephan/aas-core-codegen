@@ -93,11 +93,7 @@ def _generate_for_enum(
             textwrap.dedent(
                 f"""// marshalJSON implements the Marshaler interface for {name}
         func (e {name}) {_MARSHAL_JSON_FUNC_SIG} {{
-            if v, ok := {name}_name[e]; !ok {{
-                stream.ReportError("unknown-enum-value", fmt.Sprintf("%s is not a valid enum value", e))
-            }} else {{
-                stream.WriteString(v)
-            }}    
+            stream.WriteString({name}_name[e])            
         }}"""
             )
         )
@@ -192,12 +188,11 @@ def _generate_switch_property_unmarshaler(
                 )
 
             writer.write(
-                Stripped(
-                    textwrap.dedent(
-                        f""" \
+                textwrap.dedent(
+                    f""" \
                 {_whats_next_boundary(_PRIMITIVE_JSON_TYPE_MAP[type])}
-                c.{prop_name} = {type_reader}"""
-                    )
+                c.{prop_name} = {type_reader}
+                """
                 )
             )
 
@@ -330,12 +325,19 @@ def _generate_property_marshaler(
         pass
 
     elif isinstance(type_annotation, intermediate.ListTypeAnnotation):
+        code = "k.marshalJSON(stream)"
+
+        if isinstance(
+            type_annotation.items, intermediate.PrimitiveTypeAnnotation
+        ) or isinstance(type_annotation.items, intermediate.ConstrainedPrimitive):
+            code = _get_primitive_json_writer_method(type_annotation.items.a_type, "k")
+
         writer.write(
             textwrap.dedent(
                 f"""// loop through every element in the slice and write it to the stream
                     stream.WriteArrayStart()
                     for i, k := range c.{prop_name} {{
-                        k.marshalJSON(stream)
+                        {code}
                         if i < len(c.{prop_name}) - 1 {{
                             stream.WriteMore()
                         }}
@@ -344,8 +346,6 @@ def _generate_property_marshaler(
                 """
             )
         )
-
-        pass
 
     else:
         assert_never(type_annotation)
@@ -475,7 +475,7 @@ def _generate_for_class(
         assert code is not None
         marshaler_writer.write(code)
 
-        if i > 0 and i < len(clazz.properties):
+        if i > 0 and i < len(clazz.properties) - 1:
             marshaler_writer.write(f"stream.WriteMore() \n\n")
 
     marshaler_writer.write(f"\n\nstream.WriteObjectEnd() \n")
@@ -503,6 +503,7 @@ def generate(
             f"""import (
                         "io"
                         "fmt"
+                        "reflect"
 
 	                    json "github.com/json-iterator/go"
                     )"""
