@@ -1,13 +1,13 @@
-// Marshaler is the interface implemented by all types of the meta-model
+// AasCoreMarshaler is the interface implemented by all types of the meta-model
 // that can marshal themselves into a valid JSON.
-type Marshaler interface {
-	marshalJSON(stream *json.Stream) error
+type AasCoreMarshaler interface {
+	marshalJSON(stream *json.Stream)
 }
 
-// Unmarshaler is the interface implemented by all types of the meta-model
+// AasCoreUnmarshaler is the interface implemented by all types of the meta-model
 // that can unmarshal a JSON description of themselves.
-type Unmarshaler interface {
-	unmarshalJSON(iter *json.Iterator) error
+type AasCoreUnmarshaler interface {
+	unmarshalJSON(iter *json.Iterator)
 }
 
 // Encoder writes JSON values to an output stream.
@@ -20,25 +20,86 @@ type Decoder struct {
 	iter *json.Iterator
 }
 
+// isNonNilPointer checks, if a given value v is a pointer or not nil
+func isNonNilPointer(v interface{}) bool {
+	rv := reflect.ValueOf(v)
+	if rv.Kind() != reflect.Ptr || rv.IsNil() {
+		return false
+	}
+	return true
+}
+
+// Unmarshal parses the JSON-encoded data and stores
+// the result in the value pointed by v. If v is nil or not a pointer
+// Unmarshal returns an error. If v implements the AasCoreUnmarshaler interface
+// of the AAS-Meta-Model, data will be decoded according to the specifications of
+// the meta-model. If not, Unmarshal will decode the data in complience with
+// the standard library. It can be used as a drop-in replacement
+// of the encoding/json standard library.
+func Unmarshal(data []byte, v interface{}) error {
+	if isNonNilPointer(v) {
+		return fmt.Errorf(NonNilPointerError)
+	}
+
+	if u, ok := v.(AasCoreUnmarshaler); !ok {
+		return json.Unmarshal(data, data)
+	} else {
+		iter := json.ParseBytes(json.ConfigDefault, data)
+		dec := &Decoder{iter}
+		err := dec.Decode(u)
+		return err
+	}
+}
+
+// Marshal traverses the value v recursively. If v implements the AasCoreMarshaler
+// interface and is not a nil pointer, Marshal calls the marshalJSON method to encode
+// v according to the specifications of the AAS-Meta-Model. If v does not implement the
+// AasCoreMarshaler interface, Marshal will decode the data in complience with standard
+// library. It can be used as a drop-in replacement of the encoding/json standard library.
+func Marshal(v interface{}) ([]byte, error) {
+	if m, ok := v.(AasCoreMarshaler); !ok {
+		return json.Marshal(v)
+	} else {
+		stream := json.ConfigDefault.BorrowStream(nil)
+		enc := &Encoder{stream}
+		err := enc.Encode(m)
+		if err != nil {
+			return nil, err
+		}
+		bytes := enc.stream.Buffer()
+		return bytes, nil
+	}
+}
+
 // NewDecoder returns a new Decoder that reads from r.
 // Bs is the internal buffer size set in the NewDecoder.
 func NewDecoder(bs int, r io.Reader) *Decoder {
-	iter := json.Parse(json.ConfigDefault, r, bs)
+	iter := json.Parse(json.ConfigCompatibleWithStandardLibrary, r, bs)
 	return &Decoder{iter}
 }
 
 // NewEcoder returns a new Encoder that writes to w.
 // Bs is the internal buffer size set in the NewEncoder.
 func NewEncoder(bs int, w io.Writer) *Encoder {
-	stream := json.NewStream(json.ConfigDefault, w, bs)
+	stream := json.NewStream(json.ConfigCompatibleWithStandardLibrary, w, bs)
 	return &Encoder{stream}
 }
 
 // Decode reads the next encoded value from its input and
-// writes it in the value pointed to by v. V must implement
-// the Unmarshaler interface.
-func (d *Decoder) Decode(v Unmarshaler) error {
-	v.unmarshalJSON(d.iter)
+// writes it in the value pointed to by v. If v implements
+// the AasCoreUnmarshaler interface, v will be decoded according
+// to the specifications of the AAS-Meta-Model. If not,
+// Decode will decode the data in complience with the standard library.
+// It can be used as a drop-in replacement of the encoding/json standard library.
+func (d *Decoder) Decode(v interface{}) error {
+	if isNonNilPointer(v) {
+		return fmt.Errorf(NonNilPointerError)
+	}
+	if u, ok := v.(AasCoreUnmarshaler); !ok {
+		d.iter.ReadVal(v)
+	} else {
+		u.unmarshalJSON(d.iter)
+	}
 	err := d.iter.Error
 	if err == io.EOF {
 		return nil
@@ -46,10 +107,19 @@ func (d *Decoder) Decode(v Unmarshaler) error {
 	return d.iter.Error
 }
 
-// Encode writes the encoding of v to the input stream v
-// V must implement the Marshaler interface.
-func (e *Encoder) Encode(v Marshaler) error {
-	v.marshalJSON(e.stream)
+// Encode writes the encoding of v to the input stream v.
+// If v implements the AasCoreMarshaler interface and v is
+// not a nil pointer, Encode calls the marshalJSON method recursively
+// and encodes the data according to the specifications of the AAS-Meta-Model.
+// If v does not implement AasCoreMarshaler interface, Encode will encode the
+// data in complience with the standard library. It can be used as a drop-in
+// replacement of the encoding/json standard library.
+func (e *Encoder) Encode(v interface{}) error {
+	if m, ok := v.(AasCoreMarshaler); !ok {
+		e.stream.WriteVal(v)
+	} else {
+		m.marshalJSON(e.stream)
+	}
 	e.stream.WriteRaw("\n")
 	e.stream.Flush()
 	return e.stream.Error
