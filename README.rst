@@ -128,7 +128,7 @@ Usage
 Write your meta-model somewhere as well as the code snippets for implementation specific classes and functions.
 For example, take our `test meta-model` for inspiration how to write the meta-model and the snippets.
 
-.. _test meta_model: https://github.com/aas-core-works/aas-core-codegen/blob/main/test_data/test_csharp/test_main/v3rc2/input
+.. _test meta_model: https://github.com/aas-core-works/aas-core-codegen/blob/main/test_data/csharp/test_main/v3rc2/input
 
 Make sure you are within the virtual environment where you installed the generator.
 Alternatively, if you are using the binary release, make sure the release is on your path.
@@ -151,7 +151,8 @@ Call the generator with the appropriate target:
 .. code-block::
 
     usage: aas-core-codegen [-h] --model_path MODEL_PATH --snippets_dir
-                            SNIPPETS_DIR --output_dir OUTPUT_DIR --target {csharp}
+                            SNIPPETS_DIR --output_dir OUTPUT_DIR --target
+                            {csharp,jsonschema}
 
     Generate different implementations and schemas based on an AAS meta-model.
 
@@ -164,7 +165,8 @@ Call the generator with the appropriate target:
                             specific code snippets
       --output_dir OUTPUT_DIR
                             path to the generated code
-      --target {csharp}     target language or schema
+      --target {csharp,jsonschema}
+                            target language or schema
 
 .. Help ends: aas-core-codegen --help
 

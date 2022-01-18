@@ -107,7 +107,7 @@ def execute(context: run.Context, stdout: TextIO, stderr: TextIO) -> int:
 
     pth = context.output_dir / "types.cs"
     try:
-        pth.write_text(code)
+        pth.write_text(code, encoding="utf-8")
     except Exception as exception:
         run.write_error_report(
             message=f"Failed to write the C# structures to {pth}",
@@ -137,7 +137,7 @@ def execute(context: run.Context, stdout: TextIO, stderr: TextIO) -> int:
 
     pth = context.output_dir / "visitation.cs"
     try:
-        pth.write_text(code)
+        pth.write_text(code, encoding="utf-8")
     except Exception as exception:
         run.write_error_report(
             message=f"Failed to write the visitation C# code to {pth}",
@@ -182,7 +182,7 @@ def execute(context: run.Context, stdout: TextIO, stderr: TextIO) -> int:
 
     pth = context.output_dir / "verification.cs"
     try:
-        pth.write_text(code)
+        pth.write_text(code, encoding="utf-8")
     except Exception as exception:
         run.write_error_report(
             message=f"Failed to write the verification C# code to {pth}",
@@ -214,7 +214,7 @@ def execute(context: run.Context, stdout: TextIO, stderr: TextIO) -> int:
     pth.parent.mkdir(exist_ok=True)
 
     try:
-        pth.write_text(code)
+        pth.write_text(code, encoding="utf-8")
     except Exception as exception:
         run.write_error_report(
             message=f"Failed to write the stringification C# code to {pth}",
@@ -248,7 +248,7 @@ def execute(context: run.Context, stdout: TextIO, stderr: TextIO) -> int:
     pth.parent.mkdir(exist_ok=True)
 
     try:
-        pth.write_text(code)
+        pth.write_text(code, encoding="utf-8")
     except Exception as exception:
         run.write_error_report(
             message=f"Failed to write the jsonization C# code to {pth}",

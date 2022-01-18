@@ -11,6 +11,7 @@ from aas_core_codegen import parse, run, specific_implementations, intermediate
 from aas_core_codegen.common import LinenoColumner, assert_never
 import aas_core_codegen.csharp.main as csharp_main
 import aas_core_codegen.golang.main as golang_main
+import aas_core_codegen.jsonschema.main as jsonschema_main
 
 assert aas_core_codegen.__doc__ == __doc__
 
@@ -20,6 +21,7 @@ class Target(enum.Enum):
 
     CSHARP = "csharp"
     GOLANG = "golang"
+    JSONSCHEMA = "jsonschema"
 
 
 class Parameters:
@@ -176,8 +178,13 @@ def execute(params: Parameters, stdout: TextIO, stderr: TextIO) -> int:
     if params.target is Target.CSHARP:
         return csharp_main.execute(context=run_context, stdout=stdout, stderr=stderr)
 
-    if params.target is Target.GOLANG:
+    elif params.target is Target.GOLANG:
         return golang_main.execute(context=run_context, stdout=stdout, stderr=stderr)
+
+    elif params.target is Target.JSONSCHEMA:
+        return jsonschema_main.execute(
+            context=run_context, stdout=stdout, stderr=stderr
+        )
 
     else:
         assert_never(params.target)
