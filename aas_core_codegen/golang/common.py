@@ -1,5 +1,5 @@
 """Provide common functions shared among different Go code generation modules."""
-from typing import cast
+from typing import Tuple, cast, Iterator, Union, List, Optional
 from aas_core_codegen import intermediate
 from aas_core_codegen.common import Identifier, Stripped, assert_never
 from aas_core_codegen.golang import naming as golang_naming
@@ -19,42 +19,135 @@ PRIMITIVE_TYPE_MAP = {
     intermediate.PrimitiveType.BYTEARRAY: Stripped("[]byte"),
 }
 
+# NOTE:
+# 1. Primitive Type + Optional --> Pointer
+# 2. Primitive Type --> Primitive
+# 3. Class --> Pointer
+# 4. ListTypeAnnotation --> Slice with PointerValues
 
-def generate_type(type_annotation: intermediate.TypeAnnotationUnion) -> Stripped:
+
+def generate_type(
+    type_annotation: intermediate.TypeAnnotationUnion,
+    is_optional: bool = False,
+    enforce_pointer: bool = False,
+) -> Stripped:
     if isinstance(type_annotation, intermediate.PrimitiveTypeAnnotation):
-        return PRIMITIVE_TYPE_MAP[type_annotation.a_type]
+        t = PRIMITIVE_TYPE_MAP[type_annotation.a_type]
+        if not is_optional and enforce_pointer:
+            return f"*{t}"
+        return t
 
     elif isinstance(type_annotation, intermediate.OurTypeAnnotation):
         symbol = type_annotation.symbol
 
         if isinstance(symbol, intermediate.Enumeration):
-            return Stripped(f"*{golang_naming.enum_name(type_annotation.symbol.name)}")
+            e_type = golang_naming.enum_name(type_annotation.symbol.name)
+            if not is_optional and enforce_pointer:
+                return f"*{e_type}"
+            return e_type
 
         elif isinstance(symbol, intermediate.ConstrainedPrimitive):
-            return PRIMITIVE_TYPE_MAP[symbol.constrainee]
+            p_type = PRIMITIVE_TYPE_MAP[symbol.constrainee]
+            if not is_optional and enforce_pointer:
+                return f"*{p_type}"
+            return p_type
 
         elif isinstance(symbol, intermediate.Class):
-            return Stripped(f"*{golang_naming.class_name(symbol.name)}")
+            name = golang_naming.struct_name(symbol.name)
+            if symbol.interface:
+                name = f"{name}Data"
+
+            if is_optional:
+                return name
+            return f"*{name}"
 
     elif isinstance(type_annotation, intermediate.ListTypeAnnotation):
         item_type = generate_type(
             type_annotation=type_annotation.items,
         )
-        # NOTE Super ugly hack, to replace the pointer here (have to think about)
-        # if we need pointer slices, as slices are anyway passed as reference to functions
-        # have to think a litte more about the use cases
-        # e.g. see: https://medium.com/swlh/golang-tips-why-pointers-to-slices-are-useful-and-how-ignoring-them-can-lead-to-tricky-bugs-cac90f72e77b
-        replaced = item_type.replace("*", "")
-        return Stripped(f"[]{replaced}")
+        return f"[]{item_type}"
 
     elif isinstance(type_annotation, intermediate.RefTypeAnnotation):
-        return Stripped(f"Todo")
+        name = golang_naming.struct_name(type_annotation.value.symbol.name)
+        if is_optional:
+            return name
+        return f"*{name}"
 
-    # implement this here, although Go doesn't have optionals
-    # (instantiation always with zero value) to avoid fall through
     elif isinstance(type_annotation, intermediate.OptionalTypeAnnotation):
-        value = generate_type(type_annotation=type_annotation.value)
-        return Stripped(f"{value}")
+        value = generate_type(type_annotation=type_annotation.value, is_optional=True)
+        return f"*{value}"
 
     else:
         assert_never(type_annotation)
+
+
+def over_enumerations_classes_and_interfaces(
+    symbol_table: intermediate.SymbolTable,
+) -> Iterator[
+    Union[
+        intermediate.Enumeration,
+        intermediate.ConcreteClass,
+        intermediate.Interface,
+    ]
+]:
+    """
+    Iterate over all enumerations, concrete classes and interfaces.
+
+    These intermediate structures form the base of the C# code.
+    """
+    for symbol in symbol_table.symbols:
+        if isinstance(symbol, intermediate.Enumeration):
+            yield symbol
+        elif isinstance(symbol, intermediate.ConstrainedPrimitive):
+            pass
+        elif isinstance(symbol, intermediate.AbstractClass):
+            if symbol.interface:
+                yield symbol.interface
+        elif isinstance(symbol, intermediate.ConcreteClass):
+            if symbol.interface:
+                yield symbol.interface
+            yield symbol
+        else:
+            assert_never(symbol)
+
+
+def find_abstract_class_usage(
+    type_annotation: intermediate.TypeAnnotationUnion,
+) -> Optional[Identifier]:
+    found = None
+
+    if isinstance(type_annotation, intermediate.OurTypeAnnotation):
+        symbol = type_annotation.symbol
+        if isinstance(symbol, intermediate.AbstractClass):
+            return symbol.name
+
+    elif isinstance(type_annotation, intermediate.ListTypeAnnotation):
+        return find_abstract_class_usage(type_annotation.items)
+
+    elif isinstance(type_annotation, intermediate.RefTypeAnnotation):
+        if type_annotation.value.symbol.interface:
+            return type_annotation.value.symbol.interface.name
+
+    elif isinstance(type_annotation, intermediate.OptionalTypeAnnotation):
+        return find_abstract_class_usage(type_annotation.value)
+
+    return found
+
+
+def find_abstract_class_usages(
+    symbol_table: intermediate.SymbolTable,
+) -> List[Identifier]:
+    abstract = []  # Type: List[Identifier]
+    usages = []  # Type: List[Identifier]
+
+    for symbol in symbol_table.symbols:
+        if isinstance(symbol, intermediate.AbstractClass):
+            if symbol.name not in abstract:
+                abstract.append(symbol.name)
+        if isinstance(symbol, intermediate.ConcreteClass):
+            for prop in symbol.properties:
+                usage = find_abstract_class_usage(prop.type_annotation)
+                if usage is not None and usage not in usages:
+                    usages.append(usage)
+
+    return [value for value in abstract if value in usages]

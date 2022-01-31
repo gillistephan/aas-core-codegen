@@ -13,7 +13,7 @@ def enum_literal_name(enum_name: str, literal_name: str) -> str:
     return "{}".format("" + enum_name + literal_name.capitalize())
 
 
-def class_name(identifier: Identifier) -> Identifier:
+def struct_name(identifier: Identifier) -> Identifier:
     parts = identifier.split("_")
     return Identifier("{}".format("".join(part.capitalize() for part in parts)))
 

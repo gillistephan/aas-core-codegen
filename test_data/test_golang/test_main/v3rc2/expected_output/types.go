@@ -2,39 +2,43 @@
 
 package aascore
 
-type HasSemantics struct {
-	SemanticId *Reference
-}
-
 // Single extension of an element.
 type Extension struct {
-	SemanticId *Reference
+	SemanticId *ReferenceData
 	Name       string
 	ValueType  *DataTypeDef
-	Value      string
-	RefersTo   *Reference
-}
-
-type HasExtensions struct {
-	Extensions []Extension
+	Value      *string
+	RefersTo   *ReferenceData
 }
 
 type Referable struct {
-	Extensions  []Extension
-	IdShort     string
+	Extensions  []*Extension
+	IdShort     *string
 	DisplayName *LangStringSet
-	Category    string
+	Category    *string
 	Description *LangStringSet
 }
 
-type Identifiable struct {
-	Extensions     []Extension
-	IdShort        string
-	DisplayName    *LangStringSet
-	Category       string
-	Description    *LangStringSet
-	Id             string
-	Administration *AdministrativeInformation
+// ReferableData is a generic data type used for encoding and decoding Referable
+// holding all possible types as pointer
+type ReferableData struct {
+	*AnnotatedRelationshipElement
+	*AssetAdministrationShell
+	*BasicEvent
+	*Blob
+	*Capability
+	*ConceptDescription
+	*Entity
+	*File
+	*MultiLanguageProperty
+	*Operation
+	*Property
+	*Range
+	*ReferenceElement
+	*Submodel
+	*SubmodelElementList
+	*SubmodelElementStruct
+	*View
 }
 
 // Enumeration for denoting whether an element is a template or an instance.
@@ -59,62 +63,57 @@ func (s ModelingKind) String() string {
 	return ModelingKind_name[s]
 }
 
-type HasKind struct {
-	Kind *ModelingKind
-}
-
-type HasDataSpecification struct {
-	DataSpecifications []Reference
-}
-
 // Administrative meta-information for an element like version information.
 type AdministrativeInformation struct {
-	DataSpecifications []Reference
-	Version            string
-	Revision           string
+	DataSpecifications []*ReferenceData
+	Version            *string
+	Revision           *string
 }
 
 type Constraint struct {
 }
 
-type Qualifiable struct {
-	Qualifiers []Constraint
+// ConstraintData is a generic data type used for encoding and decoding Constraint
+// holding all possible types as pointer
+type ConstraintData struct {
+	*Formula
+	*Qualifier
 }
 
 // A qualifier is a type-value-pair that makes additional statements w.r.t.  the value
 // of the element.
 type Qualifier struct {
-	SemanticId *Reference
+	SemanticId *ReferenceData
 	Type       string
-	ValueType  *DataTypeDef
-	Value      string
-	ValueId    *Reference
+	ValueType  DataTypeDef
+	Value      *string
+	ValueId    *ReferenceData
 }
 
 // A formula is used to describe constraints by a logical expression.
 type Formula struct {
-	DependsOn []Reference
+	DependsOn []*ReferenceData
 }
 
 // Structure a digital representation of an asset.
 type AssetAdministrationShell struct {
-	DataSpecifications []Reference
-	Extensions         []Extension
-	IdShort            string
+	DataSpecifications []*ReferenceData
+	Extensions         []*Extension
+	IdShort            *string
 	DisplayName        *LangStringSet
-	Category           string
+	Category           *string
 	Description        *LangStringSet
 	Id                 string
 	Administration     *AdministrativeInformation
-	DerivedFrom        Todo
+	DerivedFrom        *AssetAdministrationShell
 	AssetInformation   *AssetInformation
-	Submodels          []Todo
+	Submodels          []*Submodel
 }
 
 // Identifying meta data of the asset that is represented by an AAS.
 type AssetInformation struct {
-	AssetKind        *AssetKind
-	GlobalAssetId    *Reference
+	AssetKind        AssetKind
+	GlobalAssetId    *ReferenceData
 	SpecificAssetId  *IdentifierKeyValuePair
 	DefaultThumbnail *File
 }
@@ -143,208 +142,223 @@ func (s AssetKind) String() string {
 
 // An IdentifierKeyValuePair describes a generic identifier as key-value pair.
 type IdentifierKeyValuePair struct {
-	SemanticId        *Reference
+	SemanticId        *ReferenceData
 	Key               string
 	Value             string
-	ExternalSubjectId *Reference
+	ExternalSubjectId *ReferenceData
 }
 
 // A submodel defines a specific aspect of the asset represented by the AAS.
 type Submodel struct {
-	DataSpecifications []Reference
+	DataSpecifications []*ReferenceData
 	Kind               *ModelingKind
-	SemanticId         *Reference
-	Qualifiers         []Constraint
-	Extensions         []Extension
-	IdShort            string
+	SemanticId         *ReferenceData
+	Qualifiers         []*ConstraintData
+	Extensions         []*Extension
+	IdShort            *string
 	DisplayName        *LangStringSet
-	Category           string
+	Category           *string
 	Description        *LangStringSet
 	Id                 string
 	Administration     *AdministrativeInformation
-	SubmodelElements   []SubmodelElement
+	SubmodelElements   []*SubmodelElementData
 }
 
 type SubmodelElement struct {
-	DataSpecifications []Reference
-	Extensions         []Extension
-	IdShort            string
+	DataSpecifications []*ReferenceData
+	Extensions         []*Extension
+	IdShort            *string
 	DisplayName        *LangStringSet
-	Category           string
+	Category           *string
 	Description        *LangStringSet
 	Kind               *ModelingKind
-	SemanticId         *Reference
-	Qualifiers         []Constraint
+	SemanticId         *ReferenceData
+	Qualifiers         []*ConstraintData
 }
 
-type RelationshipElement struct {
-	DataSpecifications []Reference
-	Extensions         []Extension
-	IdShort            string
-	DisplayName        *LangStringSet
-	Category           string
-	Description        *LangStringSet
-	Kind               *ModelingKind
-	SemanticId         *Reference
-	Qualifiers         []Constraint
-	First              *Reference
-	Second             *Reference
+// SubmodelElementData is a generic data type used for encoding and decoding SubmodelElement
+// holding all possible types as pointer
+type SubmodelElementData struct {
+	*AnnotatedRelationshipElement
+	*BasicEvent
+	*Blob
+	*Capability
+	*Entity
+	*File
+	*MultiLanguageProperty
+	*Operation
+	*Property
+	*Range
+	*ReferenceElement
+	*SubmodelElementList
+	*SubmodelElementStruct
 }
 
 // A submodel element list is an ordered collection of submodel elements.
 type SubmodelElementList struct {
-	DataSpecifications        []Reference
-	Extensions                []Extension
-	IdShort                   string
+	DataSpecifications        []*ReferenceData
+	Extensions                []*Extension
+	IdShort                   *string
 	DisplayName               *LangStringSet
-	Category                  string
+	Category                  *string
 	Description               *LangStringSet
 	Kind                      *ModelingKind
-	SemanticId                *Reference
-	Qualifiers                []Constraint
-	SubmodelElementTypeValues *SubmodelElements
-	Values                    []SubmodelElement
-	SemanticIdValues          *Reference
+	SemanticId                *ReferenceData
+	Qualifiers                []*ConstraintData
+	SubmodelElementTypeValues SubmodelElements
+	Values                    []*SubmodelElementData
+	SemanticIdValues          *ReferenceData
 	ValueTypeValues           *DataTypeDef
 }
 
 // A submodel element struct is is a logical encapsulation of multiple values. It has
 // a number of of submodel elements.
 type SubmodelElementStruct struct {
-	DataSpecifications []Reference
-	Extensions         []Extension
-	IdShort            string
+	DataSpecifications []*ReferenceData
+	Extensions         []*Extension
+	IdShort            *string
 	DisplayName        *LangStringSet
-	Category           string
+	Category           *string
 	Description        *LangStringSet
 	Kind               *ModelingKind
-	SemanticId         *Reference
-	Qualifiers         []Constraint
-	Values             []SubmodelElement
+	SemanticId         *ReferenceData
+	Qualifiers         []*ConstraintData
+	Values             []*SubmodelElementData
 }
 
 type DataElement struct {
-	DataSpecifications []Reference
-	Extensions         []Extension
-	IdShort            string
+	DataSpecifications []*ReferenceData
+	Extensions         []*Extension
+	IdShort            *string
 	DisplayName        *LangStringSet
-	Category           string
+	Category           *string
 	Description        *LangStringSet
 	Kind               *ModelingKind
-	SemanticId         *Reference
-	Qualifiers         []Constraint
+	SemanticId         *ReferenceData
+	Qualifiers         []*ConstraintData
+}
+
+// DataElementData is a generic data type used for encoding and decoding DataElement
+// holding all possible types as pointer
+type DataElementData struct {
+	*Blob
+	*File
+	*MultiLanguageProperty
+	*Property
+	*Range
+	*ReferenceElement
 }
 
 // A property is a data element that has a single value.
 type Property struct {
-	DataSpecifications []Reference
-	Extensions         []Extension
-	IdShort            string
+	DataSpecifications []*ReferenceData
+	Extensions         []*Extension
+	IdShort            *string
 	DisplayName        *LangStringSet
-	Category           string
+	Category           *string
 	Description        *LangStringSet
 	Kind               *ModelingKind
-	SemanticId         *Reference
-	Qualifiers         []Constraint
-	ValueType          *DataTypeDef
-	Value              string
-	ValueId            *Reference
+	SemanticId         *ReferenceData
+	Qualifiers         []*ConstraintData
+	ValueType          DataTypeDef
+	Value              *string
+	ValueId            *ReferenceData
 }
 
 // A property is a data element that has a multi-language value.
 type MultiLanguageProperty struct {
-	DataSpecifications []Reference
-	Extensions         []Extension
-	IdShort            string
+	DataSpecifications []*ReferenceData
+	Extensions         []*Extension
+	IdShort            *string
 	DisplayName        *LangStringSet
-	Category           string
+	Category           *string
 	Description        *LangStringSet
 	Kind               *ModelingKind
-	SemanticId         *Reference
-	Qualifiers         []Constraint
+	SemanticId         *ReferenceData
+	Qualifiers         []*ConstraintData
 	Translatable       *LangStringSet
-	ValueId            *Reference
+	ValueId            *ReferenceData
 }
 
 // A range data element is a data element that defines a range with min and max.
 type Range struct {
-	DataSpecifications []Reference
-	Extensions         []Extension
-	IdShort            string
+	DataSpecifications []*ReferenceData
+	Extensions         []*Extension
+	IdShort            *string
 	DisplayName        *LangStringSet
-	Category           string
+	Category           *string
 	Description        *LangStringSet
 	Kind               *ModelingKind
-	SemanticId         *Reference
-	Qualifiers         []Constraint
-	ValueType          *DataTypeDef
-	Min                string
-	Max                string
+	SemanticId         *ReferenceData
+	Qualifiers         []*ConstraintData
+	ValueType          DataTypeDef
+	Min                *string
+	Max                *string
 }
 
 // A reference element is a data element that defines a logical reference to another
 // element within the same or another AAS or a reference to an external object or
 // entity.
 type ReferenceElement struct {
-	DataSpecifications []Reference
-	Extensions         []Extension
-	IdShort            string
+	DataSpecifications []*ReferenceData
+	Extensions         []*Extension
+	IdShort            *string
 	DisplayName        *LangStringSet
-	Category           string
+	Category           *string
 	Description        *LangStringSet
 	Kind               *ModelingKind
-	SemanticId         *Reference
-	Qualifiers         []Constraint
-	Reference          *Reference
+	SemanticId         *ReferenceData
+	Qualifiers         []*ConstraintData
+	Reference          *ReferenceData
 }
 
 // A BLOB is a data element that represents a file that is contained with its source
 // code in the value attribute.
 type Blob struct {
-	DataSpecifications []Reference
-	Extensions         []Extension
-	IdShort            string
+	DataSpecifications []*ReferenceData
+	Extensions         []*Extension
+	IdShort            *string
 	DisplayName        *LangStringSet
-	Category           string
+	Category           *string
 	Description        *LangStringSet
 	Kind               *ModelingKind
-	SemanticId         *Reference
-	Qualifiers         []Constraint
+	SemanticId         *ReferenceData
+	Qualifiers         []*ConstraintData
 	MimeType           string
-	Content            []byte
+	Content            *[]byte
 }
 
 // A File is a data element that represents an address to a file.
 // The value is an URI that can represent an absolute or relative path.
 type File struct {
-	DataSpecifications []Reference
-	Extensions         []Extension
-	IdShort            string
+	DataSpecifications []*ReferenceData
+	Extensions         []*Extension
+	IdShort            *string
 	DisplayName        *LangStringSet
-	Category           string
+	Category           *string
 	Description        *LangStringSet
 	Kind               *ModelingKind
-	SemanticId         *Reference
-	Qualifiers         []Constraint
+	SemanticId         *ReferenceData
+	Qualifiers         []*ConstraintData
 	MimeType           string
-	Value              string
+	Value              *string
 }
 
 // An annotated relationship element is a relationship element that can be annotated
 // with additional data elements.
 type AnnotatedRelationshipElement struct {
-	DataSpecifications []Reference
-	Extensions         []Extension
-	IdShort            string
+	DataSpecifications []*ReferenceData
+	Extensions         []*Extension
+	IdShort            *string
 	DisplayName        *LangStringSet
-	Category           string
+	Category           *string
 	Description        *LangStringSet
 	Kind               *ModelingKind
-	SemanticId         *Reference
-	Qualifiers         []Constraint
-	First              *Reference
-	Second             *Reference
-	Annotation         []DataElement
+	SemanticId         *ReferenceData
+	Qualifiers         []*ConstraintData
+	First              *ReferenceData
+	Second             *ReferenceData
+	Annotation         []*DataElementData
 }
 
 // Enumeration for denoting whether an entity is a self-managed entity or a co-managed
@@ -372,112 +386,107 @@ func (s EntityType) String() string {
 
 // An entity is a submodel element that is used to model entities.
 type Entity struct {
-	DataSpecifications []Reference
-	Extensions         []Extension
-	IdShort            string
+	DataSpecifications []*ReferenceData
+	Extensions         []*Extension
+	IdShort            *string
 	DisplayName        *LangStringSet
-	Category           string
+	Category           *string
 	Description        *LangStringSet
 	Kind               *ModelingKind
-	SemanticId         *Reference
-	Qualifiers         []Constraint
-	EntityType         *EntityType
-	Statements         []SubmodelElement
-	GlobalAssetId      *Reference
+	SemanticId         *ReferenceData
+	Qualifiers         []*ConstraintData
+	EntityType         EntityType
+	Statements         []*SubmodelElementData
+	GlobalAssetId      *ReferenceData
 	SpecificAssetId    *IdentifierKeyValuePair
-}
-
-type Event struct {
-	DataSpecifications []Reference
-	Extensions         []Extension
-	IdShort            string
-	DisplayName        *LangStringSet
-	Category           string
-	Description        *LangStringSet
-	Kind               *ModelingKind
-	SemanticId         *Reference
-	Qualifiers         []Constraint
 }
 
 // A basic event.
 type BasicEvent struct {
-	DataSpecifications []Reference
-	Extensions         []Extension
-	IdShort            string
+	DataSpecifications []*ReferenceData
+	Extensions         []*Extension
+	IdShort            *string
 	DisplayName        *LangStringSet
-	Category           string
+	Category           *string
 	Description        *LangStringSet
 	Kind               *ModelingKind
-	SemanticId         *Reference
-	Qualifiers         []Constraint
-	Observed           Todo
+	SemanticId         *ReferenceData
+	Qualifiers         []*ConstraintData
+	Observed           *Referable
 }
 
 // An operation is a submodel element with input and output variables.
 type Operation struct {
-	DataSpecifications []Reference
-	Extensions         []Extension
-	IdShort            string
+	DataSpecifications []*ReferenceData
+	Extensions         []*Extension
+	IdShort            *string
 	DisplayName        *LangStringSet
-	Category           string
+	Category           *string
 	Description        *LangStringSet
 	Kind               *ModelingKind
-	SemanticId         *Reference
-	Qualifiers         []Constraint
-	InputVariables     []OperationVariable
-	OutputVariables    []OperationVariable
-	InoutputVariables  []OperationVariable
+	SemanticId         *ReferenceData
+	Qualifiers         []*ConstraintData
+	InputVariables     []*OperationVariable
+	OutputVariables    []*OperationVariable
+	InoutputVariables  []*OperationVariable
 }
 
 // An operation variable is a submodel element that is used as input or output variable
 // of an operation.
 type OperationVariable struct {
-	Value *SubmodelElement
+	Value *SubmodelElementData
 }
 
 // A capability is the implementation-independent description of the potential of an
 // asset to achieve a certain effect in the physical or virtual world.
 type Capability struct {
-	DataSpecifications []Reference
-	Extensions         []Extension
-	IdShort            string
+	DataSpecifications []*ReferenceData
+	Extensions         []*Extension
+	IdShort            *string
 	DisplayName        *LangStringSet
-	Category           string
+	Category           *string
 	Description        *LangStringSet
 	Kind               *ModelingKind
-	SemanticId         *Reference
-	Qualifiers         []Constraint
+	SemanticId         *ReferenceData
+	Qualifiers         []*ConstraintData
 }
 
 // The semantics of a property or other elements that may have a semantic description
 // is defined by a concept description. The description of the concept should follow a
 // standardized schema (realized as data specification template).
 type ConceptDescription struct {
-	DataSpecifications []Reference
-	Extensions         []Extension
-	IdShort            string
+	DataSpecifications []*ReferenceData
+	Extensions         []*Extension
+	IdShort            *string
 	DisplayName        *LangStringSet
-	Category           string
+	Category           *string
 	Description        *LangStringSet
 	Id                 string
 	Administration     *AdministrativeInformation
-	IsCaseOf           []Reference
+	IsCaseOf           []*ReferenceData
 }
 
 // A view is a collection of referable elements w.r.t. to a specific viewpoint of one
 // or more stakeholders.
 type View struct {
-	DataSpecifications []Reference
-	Extensions         []Extension
-	IdShort            string
+	DataSpecifications []*ReferenceData
+	Extensions         []*Extension
+	IdShort            *string
 	DisplayName        *LangStringSet
-	Category           string
+	Category           *string
 	Description        *LangStringSet
-	SemanticId         *Reference
-	ContainedElements  []Todo
+	SemanticId         *ReferenceData
+	ContainedElements  []*Referable
 }
 
 type Reference struct {
+}
+
+// ReferenceData is a generic data type used for encoding and decoding Reference
+// holding all possible types as pointer
+type ReferenceData struct {
+	*GlobalReference
+	*ModelReference
 }
 
 // Reference to an external entity.
@@ -490,13 +499,13 @@ type GlobalReference struct {
 // The complete list of keys may for example be concatenated to a path that then gives
 // unique access to an element.
 type ModelReference struct {
-	Keys               []Key
-	ReferredSemanticId *Reference
+	Keys               []*Key
+	ReferredSemanticId *ReferenceData
 }
 
 // A key is a reference to an element by its id.
 type Key struct {
-	Type  *KeyElements
+	Type  KeyElements
 	Value string
 }
 
@@ -1125,9 +1134,6 @@ func (s DataTypeDef) String() string {
 
 type LangStringSet struct{}
 
-type DataSpecificationContent struct {
-}
-
 type DataTypeIec61360 int32
 
 const (
@@ -1231,12 +1237,12 @@ func (s LevelType) String() string {
 // defining its semantic.
 type ValueReferencePair struct {
 	Value   string
-	ValueId *Reference
+	ValueId *ReferenceData
 }
 
 // A set of value reference pairs.
 type ValueList struct {
-	ValueReferencePairs []ValueReferencePair
+	ValueReferencePairs []*ValueReferencePair
 }
 
 // Content of data specification template for concept descriptions conformant to
@@ -1244,38 +1250,38 @@ type ValueList struct {
 type DataSpecificationIec61360 struct {
 	PreferredName      *LangStringSet
 	ShortName          *LangStringSet
-	Unit               string
-	UnitId             *Reference
-	SourceOfDefinition string
-	Symbol             string
+	Unit               *string
+	UnitId             *ReferenceData
+	SourceOfDefinition *string
+	Symbol             *string
 	DataType           *DataTypeIec61360
 	Definition         *LangStringSet
-	ValueFormat        string
+	ValueFormat        *string
 	ValueList          *ValueList
-	Value              string
-	ValueId            *Reference
+	Value              *string
+	ValueId            *ReferenceData
 	LevelType          *LevelType
 }
 
 // TODO
 type DataSpecificationPhysicalUnit struct {
-	UnitName                string
-	UnitSymbol              string
+	UnitName                *string
+	UnitSymbol              *string
 	Definition              *LangStringSet
-	SiNotation              string
-	DinNotation             string
-	EceName                 string
-	EceCode                 string
-	NistName                string
-	SourceOfDefinition      string
-	ConversionFactor        string
-	RegistrationAuthorityId string
-	Supplier                string
+	SiNotation              *string
+	DinNotation             *string
+	EceName                 *string
+	EceCode                 *string
+	NistName                *string
+	SourceOfDefinition      *string
+	ConversionFactor        *string
+	RegistrationAuthorityId *string
+	Supplier                *string
 }
 
 // Model the environment as the entry point for referencing and serialization.
 type Environment struct {
-	AssetAdministrationShells []AssetAdministrationShell
-	Submodels                 []Submodel
-	ConceptDescriptions       []ConceptDescription
+	AssetAdministrationShells []*AssetAdministrationShell
+	Submodels                 []*Submodel
+	ConceptDescriptions       []*ConceptDescription
 }

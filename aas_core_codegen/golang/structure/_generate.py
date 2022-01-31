@@ -5,13 +5,13 @@ from typing import Tuple, Optional, List
 from icontract import ensure, require
 
 from aas_core_codegen import intermediate, specific_implementations
-from aas_core_codegen.common import Error, Stripped, assert_never
+from aas_core_codegen import golang
+from aas_core_codegen.common import Error, Identifier, Stripped, assert_never
 import aas_core_codegen.golang.naming as golang_naming
 from aas_core_codegen.golang import (
     common as golang_common,
     description as golang_description,
 )
-from aas_core_codegen.csharp.common import over_enumerations_classes_and_interfaces
 
 
 @ensure(lambda result: (result[0] is None) ^ (result[1] is None))
@@ -105,14 +105,20 @@ def _generate_interface(
     interface: intermediate.Interface,
 ) -> Tuple[Optional[Stripped], Optional[Error]]:
     """
-    Generate Go code for the given interface.
+    Generate the Go code for the interface in the meta-model.
 
-    Since Go does not support Generics, the main purpose of this function
-    is just to render the respective types to have them available, even if
-    they are currently not used.
+    Go does not implement Generics. Types are just printed for reference.
+    For each inteface having implementers we generate a seperate type <name>Data for
+    encoding and decoding holding all possible types.
+
+    E.g. type SubmodelElementData struct {
+        *SubmodelElement
+        *SubmodelElementList
+        *SubmodelElementListStruct
+    }
     """
     writer = io.StringIO()
-    name = golang_naming.class_name(interface.name)
+    name = golang_naming.struct_name(interface.name)
 
     writer.write(f"type {name} struct {{")
     writer.write("\n")
@@ -124,6 +130,25 @@ def _generate_interface(
         writer.write("\n")
 
     writer.write("}")
+    writer.write("\n\n")
+
+    if len(interface.implementers) > 0:
+        writer.write(
+            f"// {name}Data is a generic data type used for encoding and decoding {name} \n // holding all possible types as pointer \n"
+        )
+        writer.write(f"type {name}Data struct {{")
+        writer.write("\n")
+
+        # NOTE: implementers itself can be abstract:
+        # e.g. SubmodelElement --> Event (Abstract) --> BasicEvent
+        for impl in interface.implementers:
+            name = golang_naming.struct_name(impl.name)
+            writer.write(f"*{name}")
+            writer.write("\n")
+
+        writer.write("\n")
+        writer.write("}")
+
     return writer.getvalue(), None
 
 
@@ -146,11 +171,11 @@ def _generate_class(
         writer.write(comment)
         writer.write("\n")
 
-    name = golang_naming.class_name(cls.name)
+    struct_name = golang_naming.struct_name(cls.name)
 
     # Type Block
     # Start
-    writer.write(f"type {name} struct {{")
+    writer.write(f"type {struct_name} struct {{")
     writer.write("\n")
 
     for prop in cls.properties:
@@ -171,13 +196,19 @@ def generate(
 ) -> Tuple[Optional[str], Optional[List[Error]]]:
     """Generate the Golang code of the structures based on the symbol table."""
 
+    abstract_usages = golang_common.find_abstract_class_usages(
+        symbol_table=symbol_table
+    )
+
     blocks = [golang_common.WARNING]  # type List[Rstripped]
     errors = []  # type List[Error]
 
     # package_name
     blocks.append(f"package {package_name}")
 
-    for something in over_enumerations_classes_and_interfaces(symbol_table):
+    for something in golang_common.over_enumerations_classes_and_interfaces(
+        symbol_table
+    ):
         code = None  # type: Optional[Stripped]
         error = None  # type: Optional[Error]
 
@@ -192,7 +223,7 @@ def generate(
             if code is None:
                 error = Error(
                     something.parsed.node,
-                    f"The implementation is missing "
+                    f"The implementation is missing",
                     f"for the implementation-specific class: {impl_key}",
                 )
                 break
@@ -200,13 +231,18 @@ def generate(
             if isinstance(something, intermediate.Enumeration):
                 code, error = _generate_enum(enum=something)
             elif isinstance(something, intermediate.Interface):
-                code, error = _generate_interface(interface=something)
+                if something.name in abstract_usages:
+                    code, error = _generate_interface(interface=something)
+                else:
+                    # set to empty string to allow assertion below
+                    code = ""
             elif isinstance(something, intermediate.ConcreteClass):
                 code, error = _generate_class(cls=something)
             else:
                 assert_never(something)
 
-        assert (code is None) ^ (error is None)
+        assert (code is not None) ^ (error is not None)
+
         if error is not None:
             errors.append(error)
         else:
