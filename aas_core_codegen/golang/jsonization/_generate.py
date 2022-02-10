@@ -236,6 +236,7 @@ def _generate_switch_property_unmarshaler(
         writer.write(
             f""" \
             // loop through every element in the array and unmarshal it
+            {_whats_next_boundary(_PRIMITIVE_JSON_TYPE_MAP["ARRAY"])}
             for el := iter.ReadArray(); el; el = iter.ReadArray() {{
         """
         )
@@ -404,20 +405,21 @@ def _generate_for_interface(
     #
     # c := struct {
     #   // base properties
-    #
     #   ... rest properties
     # }{}
     #
     temp_object_writer.write("c := struct { \n")
     temp_object_writer.write("// Shared Properties \n")
 
-    # add base properties to the temp object
-    # and write them to the switch writer
+    # iterate through all the properties of the interface
+    # 1. add the properties to the temp object
+    # 2. write them to the switch writer
     for prop in interface.properties:
 
         base_prop_names.append(prop.name)
         prop_name = golang_naming.property_name(prop.name)
         prop_type = golang_common.generate_type(type_annotation=prop.type_annotation)
+
         json_prop_name = naming.json_property(prop.name)
         temp_object_writer.write(f"{prop_name} {prop_type} \n")
 
@@ -436,10 +438,13 @@ def _generate_for_interface(
 
     prop_cache = dict()  # Type: Dict[Identifier: Dict[]]
 
+    # iterate through all the implementers
     for impl in interface.implementers:
+        # iterate through all the props of the implementer
         for prop in impl.properties:
-
+            # check if the property is inherited from the interface
             if prop.name not in base_prop_names:
+                # check whether the
                 if prop.name not in prop_cache.keys():
                     prop_name = golang_naming.property_name(prop.name)
                     prop_type = golang_common.generate_type(
@@ -455,6 +460,7 @@ def _generate_for_interface(
                     prop_cache[prop.name] = d
 
                     switch_writer.write(f'case"{json_prop_name}": \n')
+
                     code, error = _generate_switch_property_unmarshaler(
                         type_annotation=prop.type_annotation,
                         prop_name=prop_name,

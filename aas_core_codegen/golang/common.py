@@ -1,5 +1,5 @@
 """Provide common functions shared among different Go code generation modules."""
-from typing import Tuple, cast, Iterator, Union, List, Optional
+from typing import Sequence, Iterator, Union, List, Optional, Dict
 from aas_core_codegen import intermediate
 from aas_core_codegen.common import Identifier, Stripped, assert_never
 from aas_core_codegen.golang import naming as golang_naming
@@ -151,3 +151,13 @@ def find_abstract_class_usages(
                     usages.append(usage)
 
     return [value for value in abstract if value in usages]
+
+
+def find_required_properties(
+    props: Sequence[intermediate.Property],
+) -> Dict[Identifier, intermediate.Property]:
+    els = dict()  # Type: Dict[Identifier, intermediate.Property]
+    for prop in props:
+        if not isinstance(prop.type_annotation, intermediate.OptionalTypeAnnotation):
+            els[prop.name, prop]
+    return els

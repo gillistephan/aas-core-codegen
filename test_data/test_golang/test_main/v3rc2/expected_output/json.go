@@ -304,6 +304,9 @@ func (d *ReferableData) unmarshalJSON(iter *json.Iterator) {
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "extensions": // loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -331,6 +334,9 @@ func (d *ReferableData) unmarshalJSON(iter *json.Iterator) {
 			c.Description = myobj
 		case "dataSpecifications":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ReferenceData{}
 				myobj.unmarshalJSON(iter)
@@ -346,6 +352,9 @@ func (d *ReferableData) unmarshalJSON(iter *json.Iterator) {
 			c.SemanticId = myobj
 		case "qualifiers":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ConstraintData{}
 				myobj.unmarshalJSON(iter)
@@ -361,6 +370,9 @@ func (d *ReferableData) unmarshalJSON(iter *json.Iterator) {
 			c.Second = myobj
 		case "annotation":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &DataElementData{}
 				myobj.unmarshalJSON(iter)
@@ -383,6 +395,9 @@ func (d *ReferableData) unmarshalJSON(iter *json.Iterator) {
 			c.AssetInformation = myobj
 		case "submodels":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 			}
 		case "observed":
@@ -400,6 +415,9 @@ func (d *ReferableData) unmarshalJSON(iter *json.Iterator) {
 			c.Content = &val
 		case "isCaseOf":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ReferenceData{}
 				myobj.unmarshalJSON(iter)
@@ -411,6 +429,9 @@ func (d *ReferableData) unmarshalJSON(iter *json.Iterator) {
 			c.EntityType = &myenum
 		case "statements":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &SubmodelElementData{}
 				myobj.unmarshalJSON(iter)
@@ -440,6 +461,9 @@ func (d *ReferableData) unmarshalJSON(iter *json.Iterator) {
 			c.ValueId = myobj
 		case "inputVariables":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &OperationVariable{}
 				myobj.unmarshalJSON(iter)
@@ -447,6 +471,9 @@ func (d *ReferableData) unmarshalJSON(iter *json.Iterator) {
 			}
 		case "outputVariables":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &OperationVariable{}
 				myobj.unmarshalJSON(iter)
@@ -454,6 +481,9 @@ func (d *ReferableData) unmarshalJSON(iter *json.Iterator) {
 			}
 		case "inoutputVariables":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &OperationVariable{}
 				myobj.unmarshalJSON(iter)
@@ -481,6 +511,9 @@ func (d *ReferableData) unmarshalJSON(iter *json.Iterator) {
 			c.Reference = myobj
 		case "submodelElements":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &SubmodelElementData{}
 				myobj.unmarshalJSON(iter)
@@ -492,6 +525,9 @@ func (d *ReferableData) unmarshalJSON(iter *json.Iterator) {
 			c.SubmodelElementTypeValues = &myenum
 		case "values":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &SubmodelElementData{}
 				myobj.unmarshalJSON(iter)
@@ -507,6 +543,9 @@ func (d *ReferableData) unmarshalJSON(iter *json.Iterator) {
 			c.ValueTypeValues = &myenum
 		case "containedElements":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 			}
 		default:
@@ -822,6 +861,9 @@ func (c *AdministrativeInformation) unmarshalJSON(iter *json.Iterator) {
 		switch f {
 		case "dataSpecifications":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ReferenceData{}
 				myobj.unmarshalJSON(iter)
@@ -903,6 +945,9 @@ func (d *ConstraintData) unmarshalJSON(iter *json.Iterator) {
 		switch f {
 		case "dependsOn":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ReferenceData{}
 				myobj.unmarshalJSON(iter)
@@ -1048,6 +1093,9 @@ func (c *Formula) unmarshalJSON(iter *json.Iterator) {
 		switch f {
 		case "dependsOn":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ReferenceData{}
 				myobj.unmarshalJSON(iter)
@@ -1098,6 +1146,9 @@ func (c *AssetAdministrationShell) unmarshalJSON(iter *json.Iterator) {
 		switch f {
 		case "dataSpecifications":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ReferenceData{}
 				myobj.unmarshalJSON(iter)
@@ -1106,6 +1157,9 @@ func (c *AssetAdministrationShell) unmarshalJSON(iter *json.Iterator) {
 			isThere["dataSpecifications"] = true
 		case "extensions":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -1150,6 +1204,9 @@ func (c *AssetAdministrationShell) unmarshalJSON(iter *json.Iterator) {
 			c.AssetInformation = myobj
 		case "submodels":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 			}
 			isThere["submodels"] = true
@@ -1408,6 +1465,9 @@ func (c *Submodel) unmarshalJSON(iter *json.Iterator) {
 		switch f {
 		case "dataSpecifications":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ReferenceData{}
 				myobj.unmarshalJSON(iter)
@@ -1424,6 +1484,9 @@ func (c *Submodel) unmarshalJSON(iter *json.Iterator) {
 			c.SemanticId = myobj
 		case "qualifiers":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ConstraintData{}
 				myobj.unmarshalJSON(iter)
@@ -1432,6 +1495,9 @@ func (c *Submodel) unmarshalJSON(iter *json.Iterator) {
 			isThere["qualifiers"] = true
 		case "extensions":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -1470,6 +1536,9 @@ func (c *Submodel) unmarshalJSON(iter *json.Iterator) {
 			c.Administration = myobj
 		case "submodelElements":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &SubmodelElementData{}
 				myobj.unmarshalJSON(iter)
@@ -1653,12 +1722,18 @@ func (d *SubmodelElementData) unmarshalJSON(iter *json.Iterator) {
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dataSpecifications": // loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ReferenceData{}
 				myobj.unmarshalJSON(iter)
 				c.DataSpecifications = append(c.DataSpecifications, myobj)
 			}
 		case "extensions": // loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -1693,6 +1768,9 @@ func (d *SubmodelElementData) unmarshalJSON(iter *json.Iterator) {
 			myobj.unmarshalJSON(iter)
 			c.SemanticId = myobj
 		case "qualifiers": // loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ConstraintData{}
 				myobj.unmarshalJSON(iter)
@@ -1708,6 +1786,9 @@ func (d *SubmodelElementData) unmarshalJSON(iter *json.Iterator) {
 			c.Second = myobj
 		case "annotation":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &DataElementData{}
 				myobj.unmarshalJSON(iter)
@@ -1732,6 +1813,9 @@ func (d *SubmodelElementData) unmarshalJSON(iter *json.Iterator) {
 			c.EntityType = &myenum
 		case "statements":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &SubmodelElementData{}
 				myobj.unmarshalJSON(iter)
@@ -1761,6 +1845,9 @@ func (d *SubmodelElementData) unmarshalJSON(iter *json.Iterator) {
 			c.ValueId = myobj
 		case "inputVariables":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &OperationVariable{}
 				myobj.unmarshalJSON(iter)
@@ -1768,6 +1855,9 @@ func (d *SubmodelElementData) unmarshalJSON(iter *json.Iterator) {
 			}
 		case "outputVariables":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &OperationVariable{}
 				myobj.unmarshalJSON(iter)
@@ -1775,6 +1865,9 @@ func (d *SubmodelElementData) unmarshalJSON(iter *json.Iterator) {
 			}
 		case "inoutputVariables":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &OperationVariable{}
 				myobj.unmarshalJSON(iter)
@@ -1806,6 +1899,9 @@ func (d *SubmodelElementData) unmarshalJSON(iter *json.Iterator) {
 			c.SubmodelElementTypeValues = &myenum
 		case "values":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &SubmodelElementData{}
 				myobj.unmarshalJSON(iter)
@@ -2046,6 +2142,9 @@ func (c *SubmodelElementList) unmarshalJSON(iter *json.Iterator) {
 		switch f {
 		case "dataSpecifications":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ReferenceData{}
 				myobj.unmarshalJSON(iter)
@@ -2054,6 +2153,9 @@ func (c *SubmodelElementList) unmarshalJSON(iter *json.Iterator) {
 			isThere["dataSpecifications"] = true
 		case "extensions":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -2090,6 +2192,9 @@ func (c *SubmodelElementList) unmarshalJSON(iter *json.Iterator) {
 			c.SemanticId = myobj
 		case "qualifiers":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ConstraintData{}
 				myobj.unmarshalJSON(iter)
@@ -2103,6 +2208,9 @@ func (c *SubmodelElementList) unmarshalJSON(iter *json.Iterator) {
 			isThere["submodelElementTypeValues"] = true
 		case "values":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &SubmodelElementData{}
 				myobj.unmarshalJSON(iter)
@@ -2247,6 +2355,9 @@ func (c *SubmodelElementStruct) unmarshalJSON(iter *json.Iterator) {
 		switch f {
 		case "dataSpecifications":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ReferenceData{}
 				myobj.unmarshalJSON(iter)
@@ -2255,6 +2366,9 @@ func (c *SubmodelElementStruct) unmarshalJSON(iter *json.Iterator) {
 			isThere["dataSpecifications"] = true
 		case "extensions":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -2291,6 +2405,9 @@ func (c *SubmodelElementStruct) unmarshalJSON(iter *json.Iterator) {
 			c.SemanticId = myobj
 		case "qualifiers":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ConstraintData{}
 				myobj.unmarshalJSON(iter)
@@ -2299,6 +2416,9 @@ func (c *SubmodelElementStruct) unmarshalJSON(iter *json.Iterator) {
 			isThere["qualifiers"] = true
 		case "values":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &SubmodelElementData{}
 				myobj.unmarshalJSON(iter)
@@ -2442,12 +2562,18 @@ func (d *DataElementData) unmarshalJSON(iter *json.Iterator) {
 	for f := iter.ReadObject(); f != ""; f = iter.ReadObject() {
 		switch f {
 		case "dataSpecifications": // loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ReferenceData{}
 				myobj.unmarshalJSON(iter)
 				c.DataSpecifications = append(c.DataSpecifications, myobj)
 			}
 		case "extensions": // loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -2482,6 +2608,9 @@ func (d *DataElementData) unmarshalJSON(iter *json.Iterator) {
 			myobj.unmarshalJSON(iter)
 			c.SemanticId = myobj
 		case "qualifiers": // loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ConstraintData{}
 				myobj.unmarshalJSON(iter)
@@ -2658,6 +2787,9 @@ func (c *Property) unmarshalJSON(iter *json.Iterator) {
 		switch f {
 		case "dataSpecifications":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ReferenceData{}
 				myobj.unmarshalJSON(iter)
@@ -2666,6 +2798,9 @@ func (c *Property) unmarshalJSON(iter *json.Iterator) {
 			isThere["dataSpecifications"] = true
 		case "extensions":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -2702,6 +2837,9 @@ func (c *Property) unmarshalJSON(iter *json.Iterator) {
 			c.SemanticId = myobj
 		case "qualifiers":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ConstraintData{}
 				myobj.unmarshalJSON(iter)
@@ -2840,6 +2978,9 @@ func (c *MultiLanguageProperty) unmarshalJSON(iter *json.Iterator) {
 		switch f {
 		case "dataSpecifications":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ReferenceData{}
 				myobj.unmarshalJSON(iter)
@@ -2848,6 +2989,9 @@ func (c *MultiLanguageProperty) unmarshalJSON(iter *json.Iterator) {
 			isThere["dataSpecifications"] = true
 		case "extensions":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -2884,6 +3028,9 @@ func (c *MultiLanguageProperty) unmarshalJSON(iter *json.Iterator) {
 			c.SemanticId = myobj
 		case "qualifiers":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ConstraintData{}
 				myobj.unmarshalJSON(iter)
@@ -3012,6 +3159,9 @@ func (c *Range) unmarshalJSON(iter *json.Iterator) {
 		switch f {
 		case "dataSpecifications":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ReferenceData{}
 				myobj.unmarshalJSON(iter)
@@ -3020,6 +3170,9 @@ func (c *Range) unmarshalJSON(iter *json.Iterator) {
 			isThere["dataSpecifications"] = true
 		case "extensions":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -3056,6 +3209,9 @@ func (c *Range) unmarshalJSON(iter *json.Iterator) {
 			c.SemanticId = myobj
 		case "qualifiers":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ConstraintData{}
 				myobj.unmarshalJSON(iter)
@@ -3196,6 +3352,9 @@ func (c *ReferenceElement) unmarshalJSON(iter *json.Iterator) {
 		switch f {
 		case "dataSpecifications":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ReferenceData{}
 				myobj.unmarshalJSON(iter)
@@ -3204,6 +3363,9 @@ func (c *ReferenceElement) unmarshalJSON(iter *json.Iterator) {
 			isThere["dataSpecifications"] = true
 		case "extensions":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -3240,6 +3402,9 @@ func (c *ReferenceElement) unmarshalJSON(iter *json.Iterator) {
 			c.SemanticId = myobj
 		case "qualifiers":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ConstraintData{}
 				myobj.unmarshalJSON(iter)
@@ -3358,6 +3523,9 @@ func (c *Blob) unmarshalJSON(iter *json.Iterator) {
 		switch f {
 		case "dataSpecifications":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ReferenceData{}
 				myobj.unmarshalJSON(iter)
@@ -3366,6 +3534,9 @@ func (c *Blob) unmarshalJSON(iter *json.Iterator) {
 			isThere["dataSpecifications"] = true
 		case "extensions":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -3402,6 +3573,9 @@ func (c *Blob) unmarshalJSON(iter *json.Iterator) {
 			c.SemanticId = myobj
 		case "qualifiers":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ConstraintData{}
 				myobj.unmarshalJSON(iter)
@@ -3532,6 +3706,9 @@ func (c *File) unmarshalJSON(iter *json.Iterator) {
 		switch f {
 		case "dataSpecifications":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ReferenceData{}
 				myobj.unmarshalJSON(iter)
@@ -3540,6 +3717,9 @@ func (c *File) unmarshalJSON(iter *json.Iterator) {
 			isThere["dataSpecifications"] = true
 		case "extensions":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -3576,6 +3756,9 @@ func (c *File) unmarshalJSON(iter *json.Iterator) {
 			c.SemanticId = myobj
 		case "qualifiers":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ConstraintData{}
 				myobj.unmarshalJSON(iter)
@@ -3708,6 +3891,9 @@ func (c *AnnotatedRelationshipElement) unmarshalJSON(iter *json.Iterator) {
 		switch f {
 		case "dataSpecifications":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ReferenceData{}
 				myobj.unmarshalJSON(iter)
@@ -3716,6 +3902,9 @@ func (c *AnnotatedRelationshipElement) unmarshalJSON(iter *json.Iterator) {
 			isThere["dataSpecifications"] = true
 		case "extensions":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -3752,6 +3941,9 @@ func (c *AnnotatedRelationshipElement) unmarshalJSON(iter *json.Iterator) {
 			c.SemanticId = myobj
 		case "qualifiers":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ConstraintData{}
 				myobj.unmarshalJSON(iter)
@@ -3770,6 +3962,9 @@ func (c *AnnotatedRelationshipElement) unmarshalJSON(iter *json.Iterator) {
 			c.Second = myobj
 		case "annotation":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &DataElementData{}
 				myobj.unmarshalJSON(iter)
@@ -3914,6 +4109,9 @@ func (c *Entity) unmarshalJSON(iter *json.Iterator) {
 		switch f {
 		case "dataSpecifications":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ReferenceData{}
 				myobj.unmarshalJSON(iter)
@@ -3922,6 +4120,9 @@ func (c *Entity) unmarshalJSON(iter *json.Iterator) {
 			isThere["dataSpecifications"] = true
 		case "extensions":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -3958,6 +4159,9 @@ func (c *Entity) unmarshalJSON(iter *json.Iterator) {
 			c.SemanticId = myobj
 		case "qualifiers":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ConstraintData{}
 				myobj.unmarshalJSON(iter)
@@ -3971,6 +4175,9 @@ func (c *Entity) unmarshalJSON(iter *json.Iterator) {
 			isThere["entityType"] = true
 		case "statements":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &SubmodelElementData{}
 				myobj.unmarshalJSON(iter)
@@ -4115,6 +4322,9 @@ func (c *BasicEvent) unmarshalJSON(iter *json.Iterator) {
 		switch f {
 		case "dataSpecifications":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ReferenceData{}
 				myobj.unmarshalJSON(iter)
@@ -4123,6 +4333,9 @@ func (c *BasicEvent) unmarshalJSON(iter *json.Iterator) {
 			isThere["dataSpecifications"] = true
 		case "extensions":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -4159,6 +4372,9 @@ func (c *BasicEvent) unmarshalJSON(iter *json.Iterator) {
 			c.SemanticId = myobj
 		case "qualifiers":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ConstraintData{}
 				myobj.unmarshalJSON(iter)
@@ -4273,6 +4489,9 @@ func (c *Operation) unmarshalJSON(iter *json.Iterator) {
 		switch f {
 		case "dataSpecifications":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ReferenceData{}
 				myobj.unmarshalJSON(iter)
@@ -4281,6 +4500,9 @@ func (c *Operation) unmarshalJSON(iter *json.Iterator) {
 			isThere["dataSpecifications"] = true
 		case "extensions":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -4317,6 +4539,9 @@ func (c *Operation) unmarshalJSON(iter *json.Iterator) {
 			c.SemanticId = myobj
 		case "qualifiers":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ConstraintData{}
 				myobj.unmarshalJSON(iter)
@@ -4325,6 +4550,9 @@ func (c *Operation) unmarshalJSON(iter *json.Iterator) {
 			isThere["qualifiers"] = true
 		case "inputVariables":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &OperationVariable{}
 				myobj.unmarshalJSON(iter)
@@ -4333,6 +4561,9 @@ func (c *Operation) unmarshalJSON(iter *json.Iterator) {
 			isThere["inputVariables"] = true
 		case "outputVariables":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &OperationVariable{}
 				myobj.unmarshalJSON(iter)
@@ -4341,6 +4572,9 @@ func (c *Operation) unmarshalJSON(iter *json.Iterator) {
 			isThere["outputVariables"] = true
 		case "inoutputVariables":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &OperationVariable{}
 				myobj.unmarshalJSON(iter)
@@ -4519,6 +4753,9 @@ func (c *Capability) unmarshalJSON(iter *json.Iterator) {
 		switch f {
 		case "dataSpecifications":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ReferenceData{}
 				myobj.unmarshalJSON(iter)
@@ -4527,6 +4764,9 @@ func (c *Capability) unmarshalJSON(iter *json.Iterator) {
 			isThere["dataSpecifications"] = true
 		case "extensions":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -4563,6 +4803,9 @@ func (c *Capability) unmarshalJSON(iter *json.Iterator) {
 			c.SemanticId = myobj
 		case "qualifiers":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ConstraintData{}
 				myobj.unmarshalJSON(iter)
@@ -4671,6 +4914,9 @@ func (c *ConceptDescription) unmarshalJSON(iter *json.Iterator) {
 		switch f {
 		case "dataSpecifications":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ReferenceData{}
 				myobj.unmarshalJSON(iter)
@@ -4679,6 +4925,9 @@ func (c *ConceptDescription) unmarshalJSON(iter *json.Iterator) {
 			isThere["dataSpecifications"] = true
 		case "extensions":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -4717,6 +4966,9 @@ func (c *ConceptDescription) unmarshalJSON(iter *json.Iterator) {
 			c.Administration = myobj
 		case "isCaseOf":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ReferenceData{}
 				myobj.unmarshalJSON(iter)
@@ -4822,6 +5074,9 @@ func (c *View) unmarshalJSON(iter *json.Iterator) {
 		switch f {
 		case "dataSpecifications":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ReferenceData{}
 				myobj.unmarshalJSON(iter)
@@ -4830,6 +5085,9 @@ func (c *View) unmarshalJSON(iter *json.Iterator) {
 			isThere["dataSpecifications"] = true
 		case "extensions":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Extension{}
 				myobj.unmarshalJSON(iter)
@@ -4862,6 +5120,9 @@ func (c *View) unmarshalJSON(iter *json.Iterator) {
 			c.SemanticId = myobj
 		case "containedElements":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 			}
 			isThere["containedElements"] = true
@@ -4964,6 +5225,9 @@ func (d *ReferenceData) unmarshalJSON(iter *json.Iterator) {
 		switch f {
 		case "values":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				if next := iter.WhatIsNext(); next != json.StringValue {
 					iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.StringValue, got: %s", next))
@@ -4973,6 +5237,9 @@ func (d *ReferenceData) unmarshalJSON(iter *json.Iterator) {
 			}
 		case "keys":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Key{}
 				myobj.unmarshalJSON(iter)
@@ -5020,6 +5287,9 @@ func (c *GlobalReference) unmarshalJSON(iter *json.Iterator) {
 		switch f {
 		case "values":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				if next := iter.WhatIsNext(); next != json.StringValue {
 					iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.StringValue, got: %s", next))
@@ -5067,6 +5337,9 @@ func (c *ModelReference) unmarshalJSON(iter *json.Iterator) {
 		switch f {
 		case "keys":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Key{}
 				myobj.unmarshalJSON(iter)
@@ -5417,6 +5690,9 @@ func (c *ValueList) unmarshalJSON(iter *json.Iterator) {
 		switch f {
 		case "valueReferencePairs":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ValueReferencePair{}
 				myobj.unmarshalJSON(iter)
@@ -5793,6 +6069,9 @@ func (c *Environment) unmarshalJSON(iter *json.Iterator) {
 		switch f {
 		case "assetAdministrationShells":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &AssetAdministrationShell{}
 				myobj.unmarshalJSON(iter)
@@ -5801,6 +6080,9 @@ func (c *Environment) unmarshalJSON(iter *json.Iterator) {
 			isThere["assetAdministrationShells"] = true
 		case "submodels":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &Submodel{}
 				myobj.unmarshalJSON(iter)
@@ -5809,6 +6091,9 @@ func (c *Environment) unmarshalJSON(iter *json.Iterator) {
 			isThere["submodels"] = true
 		case "conceptDescriptions":
 			// loop through every element in the array and unmarshal it
+			if next := iter.WhatIsNext(); next != json.ArrayValue {
+				iter.ReportError("unexpected-json-type", fmt.Sprintf("expected json.ArrayValue, got: %s", next))
+			}
 			for el := iter.ReadArray(); el; el = iter.ReadArray() {
 				myobj := &ConceptDescription{}
 				myobj.unmarshalJSON(iter)
